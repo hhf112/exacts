@@ -1,0 +1,1 @@
+g++ -std=c++17 -pthread src/BoyreMoore.cpp src/BoyreMoore-io.cpp benchmark.cpp -o srch
