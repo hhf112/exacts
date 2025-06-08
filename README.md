@@ -4,5 +4,6 @@ Work in progress.
 A library for parallelized exact string searching using the classical Boyre Moore Algorithm.
 
 - [ ] add support for size_t
+- [ ] build system: Makefile / CMake or  Make the library header only
 
 
