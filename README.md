@@ -1,9 +1,4 @@
-Work in progress.
+Work in progress. Repo is currently very raw and commmits are expected to be slow.
 
-# Parallelized Boyre Moore Search
-A library for parallelized exact string searching using the classical Boyre Moore Algorithm.
-
-- [ ] add support for size_t
-- [ ] build system: Makefile / CMake or  Make the library header only
 
 
