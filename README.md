@@ -1,4 +1,4 @@
-Work in progress. Repo is currently very raw and commmits are expected to be slow.
+Work in progress. Currently very raw and commits are expected to be slow.
 
 
 
