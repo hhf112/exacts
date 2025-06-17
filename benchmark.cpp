@@ -1,5 +1,4 @@
 #include <iterator>
-#include <optional>
 #include <vector>
 #include <iostream>
 
@@ -23,35 +22,37 @@ int main(int argc, char *argv[]) {
     std::string filepath(argv[1]);
 
 
-    std::vector<size_t> res1;
+    std::vector<size_t> res1, res2, res3;
     auto strt = high_resolution_clock::now();
     bm.find(filepath,
             pattern,
-            res1.begin());
+            std::back_inserter(res1));
     auto en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
     std::cout << "classical search function find: " << en.count() << " ms.\n";
     std::cout << "found: " << res1.size() << '\n';
 
-    std::vector<size_t> res2;
+    bm.set_count(0);
+
     strt = high_resolution_clock::now();
     bm.pfind(filepath,
              pattern,
-             res2.begin());
+             std::back_inserter(res2));
     en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
 
     std::cout << "parallel search function pfind: " << en.count() << " ms.\n";
     std::cout << "found: " << res2.size() << '\n';
 
-    std::vector<size_t> res3;
-    strt = high_resolution_clock::now();
-    bm.pfind_unique( filepath,
-                    pattern,
-                    res3.begin());
-    en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
 
-    std::cout << "parallel search function pfind_unique: " << en.count()
-        << " ms.\n";
-    std::cout << "found: " << res3.size() << '\n';
 
+    // strt = high_resolution_clock::now();
+    // bm.pfind_unique( filepath,
+    //                 pattern,
+    //                 std::back_inserter(res3));
+    // en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
+    //
+    // std::cout << "parallel search function pfind_unique: " << en.count()
+    //     << " ms.\n";
+    // std::cout << "found: " << res3.size() << '\n';
+    //
     return 0;
 }
