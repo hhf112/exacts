@@ -8,19 +8,18 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <thread>
-#include <unordered_set>
 #include <vector>
+
+#define MB 1048576
 
 #define END_STREAM 1
 #define CONT_STREAM 0
 
 #define MAX_MATCHES 1000000
-#define MB 1048576
 #define MAX_CHUNK_LIMIT 128 * 1048576
-#define CHECK_TICKER 1000
+#define CHECK_TICKER 100
 
 using index_t = std::ptrdiff_t;
 
@@ -34,9 +33,10 @@ class BoyreMoore {
     };
   };
 
-  inline void set_m_search_count(size_t n) { m_search_count = n; }
+  inline void set_search_count(size_t n) { m_search_count = n; }
   inline void set_chunk_size(size_t n) { m_chunk_size = n; }
-  // #find
+
+
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &m_path,
                                     const std::string &pattern,
@@ -55,7 +55,6 @@ class BoyreMoore {
     return beg;
   }
 
-  // pfind
   template <typename OutputItStart>
   inline std::optional<OutputItStart> pfind(const std::string &m_path,
                                             const std::string &pattern,
@@ -79,13 +78,11 @@ class BoyreMoore {
     return beg;
   }
 
-  // #search
   template <typename OutputItStart>
   inline int search(const std::string &text, const std::string &pat,
                     size_t startPos, size_t endPos, size_t startIndex,
                     OutputItStart beg, int matches = MAX_MATCHES);
 
-  // #parallelSearch
   template <typename OutputItStart>
   inline std::optional<OutputItStart> parallelSearch(const std::string &text,
                                                      const std::string &pattern,
@@ -96,20 +93,15 @@ class BoyreMoore {
  private:
   std::atomic<size_t> m_search_count = 0;
 
-  //  No of characters to be considerd for bad character heuristic.
   const size_t m_nchars = 256;
 
-  // size per chunk of m_filestream in bytes.
   size_t m_chunk_size = 5 * MB;
 
-  // m_filem_path.
   std::string m_path;
   std::string m_buffer;
   std::fstream m_file;
 
-  // No of shifts for every index preproccessed for Good suffix heuristic
   std::vector<size_t> m_shift;
-  // border positions preprocessed for Good suffix heuristic
   std::vector<size_t> m_bpos;
   std::vector<index_t> m_badchar;
 
@@ -120,29 +112,24 @@ class BoyreMoore {
   inline void preprocess_strong_suffix(const std::string &pat, size_t m);
   inline void preprocess_case2(const std::string &pat, size_t m);
 
-  // > initializes m_file m_path.
-  // > and sets chunk size to be fetched =  min (passed chunk size, 50 Mb(s)).
-  // > opens m_file.
   int startStream(const std::string &p) {
     m_path = p;
     m_chunk_size = std::min(m_chunk_size, (size_t)MAX_CHUNK_LIMIT);
     m_file = std::fstream(m_path, std::ios::in);
 
     if (!m_file) {
-      std::cerr << "startStream: unable to open m_file\n";
+      std::cerr << "startStream: unable to open file\n";
       return 1;
     }
     try {
       m_buffer.resize(m_chunk_size, 'a');
     } catch (std::length_error) {
-      std::cerr << "startStream: unable to allocate m_buffer.\n";
+      std::cerr << "startStream: unable to allocate buffer.\n";
       return 1;
     }
     return 0;
   }
 
-  //> reads chunks overlapping by patternlength to avoid search misses.
-  //> runs action for each chunk.
   void forStream(size_t patternlen,
                  const std::function<int(const std::string &)> &action) {
     if (patternlen == 0) return;
@@ -203,7 +190,6 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
       shift_bchr = s + plen < en ? plen - m_badchar[text[s + patlen]]
                                  : static_cast<index_t>(1);
       shift_gsfx = static_cast<index_t>(m_shift[0]);
-
     } else {
       shift_gsfx = static_cast<index_t>(m_shift[j + 1]);
       shift_bchr = std::max(static_cast<index_t>(1), j - m_badchar[text[s + j]]);
