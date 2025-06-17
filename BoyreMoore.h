@@ -22,14 +22,14 @@ using index_t = std::ptrdiff_t;
 
 class BoyreMoore {
  private:
-  static const int MAX_MATCHES = 10000000;
-  std::atomic<int> search_count = 0;
+  static const int MAX_MATCHES = 1000000;
+  std::atomic<size_t> search_count = 0;
 
   //  No of characters to be considerd for bad character heuristic.
   const size_t nchars = 256;
 
   // size per chunk of filestream in bytes.
-  size_t chunkSize = 10 * MB;
+  size_t chunkSize = 1 * MB;
 
   // filepath.
   std::string path;
@@ -71,8 +71,8 @@ class BoyreMoore {
     };
   };
 
-  void set_count(int n) { search_count = n; }
-
+  void set_search_count(size_t n) { search_count = n; }
+  void set_chunk_size(size_t n) {chunkSize = n; }
   // #find
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &path,
@@ -116,23 +116,6 @@ class BoyreMoore {
     return beg;
   }
 
-  // // #pfind_unique
-  // template <typename OutputItStart>
-  // std::optional<OutputItStart> pfind_unique(const std::string &path,
-  //                                           const std::string &pattern,
-  //                                           OutputItStart beg,
-  //                                           int matches = MAX_MATCHES) {
-  //   OutputItStart start = beg;
-  //   std::optional<OutputItStart> check = pfind(path, pattern, beg, matches);
-  //   if (!check.has_value())
-  //     return {};
-  //   else
-  //     beg = check.value();
-  //
-  //   std::sort(start, beg);
-  //   auto en = std::unique(start, beg);
-  //   return en;
-  // }
 
   // #search
   template <typename OutputItStart>
