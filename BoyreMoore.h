@@ -36,7 +36,6 @@ class BoyreMoore {
   inline void set_search_count(size_t n) { m_search_count = n; }
   inline void set_chunk_size(size_t n) { m_chunk_size = n; }
 
-
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &m_path,
                                     const std::string &pattern,
@@ -48,10 +47,11 @@ class BoyreMoore {
     forStream(pattern.length(), [&](const std::string &buf) {
       search(buf, pattern, 0, buf.length(), startIndex, beg, matches);
       if (m_search_count >= matches) return END_STREAM;
-      startIndex += m_chunk_size - pattern.length() + 1;
+      startIndex += m_buffer.length() - pattern.length() + 1;
       return CONT_STREAM;
     });
 
+    m_file.close();
     return beg;
   }
 
@@ -63,6 +63,7 @@ class BoyreMoore {
     if (startStream(m_path) == 1) return {};
 
     size_t startIndex = 0;
+    int cnt = 0;
     forStream(pattern.length(), [&](const std::string &buf) {
       std::optional<OutputItStart> check =
           parallelSearch(buf, pattern, startIndex, beg, matches);
@@ -71,10 +72,11 @@ class BoyreMoore {
       beg = check.value();
       if (m_search_count >= matches) return END_STREAM;
 
-      startIndex += m_chunk_size - pattern.length() + 1;
+      startIndex += m_buffer.length() - pattern.length() + 1;
       return CONT_STREAM;
     });
 
+    m_file.close();
     return beg;
   }
 
@@ -142,7 +144,8 @@ class BoyreMoore {
 
     while (m_file.gcount()) {
       if (action(m_buffer) == 1) break;
-      std::memcpy(m_buffer.data(), m_buffer.data() + m_chunk_size, patternlen - 1);
+      std::memcpy(m_buffer.data(), m_buffer.data() + m_chunk_size,
+                  patternlen - 1);
       m_file.read(m_buffer.data() + patternlen - 1, m_chunk_size);
     }
   }
@@ -174,11 +177,11 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
 
   int local_iter_count = 0;
   while (s <= en - plen) {
-    if (local_iter_count % CHECK_TICKER) {
-      if (m_search_count >= matches) {
-        return m_search_count;
-      }
-    }
+     if (local_iter_count % CHECK_TICKER) {
+       if (m_search_count >= matches) {
+         return m_search_count;
+       }
+     }
 
     j = plen - 1;
     while (j >= 0 && pat[j] == text[s + j]) --j;
@@ -192,7 +195,8 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
       shift_gsfx = static_cast<index_t>(m_shift[0]);
     } else {
       shift_gsfx = static_cast<index_t>(m_shift[j + 1]);
-      shift_bchr = std::max(static_cast<index_t>(1), j - m_badchar[text[s + j]]);
+      shift_bchr =
+          std::max(static_cast<index_t>(1), j - m_badchar[text[s + j]]);
     }
 
     s += std::max(shift_gsfx, shift_bchr);
@@ -205,7 +209,6 @@ template <typename OutputItStart>
 std::optional<OutputItStart> BoyreMoore::parallelSearch(
     const std::string &text, const std::string &pattern, size_t startIndex,
     OutputItStart beg, int matches) {
-
   const int concurrency = std::thread::hardware_concurrency();
   if (!concurrency) {
     std::cerr << "parallelSearch: No threads available on system.\n";
@@ -227,6 +230,7 @@ std::optional<OutputItStart> BoyreMoore::parallelSearch(
     index_t endPos =
         std::min((i + 1) * static_cast<index_t>(part) + patlen - 1, txtlen);
 
+
     threads[i] = std::thread([&, i]() {
       search(text, pattern, startPos, endPos, startIndex,
              std::back_inserter(results[i]), matches);
@@ -237,6 +241,7 @@ std::optional<OutputItStart> BoyreMoore::parallelSearch(
     threads[i].join();
     beg = std::copy(results[i].begin(), results[i].end(), beg);
   }
+
 
   return beg;
 }
