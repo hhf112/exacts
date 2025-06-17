@@ -1,5 +1,7 @@
 #pragma once
 #include <algorithm>
+#include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <fstream>
 #include <functional>
@@ -12,17 +14,22 @@
 #include <unordered_set>
 #include <vector>
 
-#define MAX_MATCHES 1000000
+#define END_STREAM 1
+#define CONT_STREAM 0
+#define MB 1048576
 
 using index_t = std::ptrdiff_t;
 
 class BoyreMoore {
  private:
+  static const int MAX_MATCHES = 10000000;
+  std::atomic<int> search_count = 0;
+
   //  No of characters to be considerd for bad character heuristic.
-  const size_t nchars;
+  const size_t nchars = 256;
 
   // size per chunk of filestream in bytes.
-  size_t chunkSize = 1 * 1024 * 1024;
+  size_t chunkSize = 10 * MB;
 
   // filepath.
   std::string path;
@@ -64,6 +71,8 @@ class BoyreMoore {
     };
   };
 
+  void set_count(int n) { search_count = n; }
+
   // #find
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &path,
@@ -72,84 +81,72 @@ class BoyreMoore {
                                     int matches = MAX_MATCHES) {
     if (startStream(path) == 1) return {};
 
-    if (!badchar.size()) {
-      std::cerr << "find: badchars not initialized\n";
-      return {};
-    }
-
     size_t startIndex = 0;
-    int found = 0;
     forStream(pattern.length(), [&](const std::string &buf) {
-      found += search(buf, pattern, 0, buf.length(), startIndex, beg,
-                      matches - found);
-      beg += found;
-      if (found == matches) return 1;
-
+      search(buf, pattern, 0, buf.length(), startIndex, beg, matches);
+      if (search_count >= matches) return END_STREAM;
       startIndex += chunkSize - pattern.length() + 1;
-      return 0;
+      return CONT_STREAM;
     });
 
     return beg;
   }
 
-  // #pfind
+  // pfind
   template <typename OutputItStart>
   std::optional<OutputItStart> pfind(const std::string &path,
                                      const std::string &pattern,
                                      OutputItStart beg,
                                      int matches = MAX_MATCHES) {
-    if (!badchar.size()) {
-      std::cerr << "pfind: badchars not initialized\n";
-      return {};
-    }
     if (startStream(path) == 1) return {};
 
     size_t startIndex = 0;
-    int found = 0;
     forStream(pattern.length(), [&](const std::string &buf) {
       std::optional<OutputItStart> check =
-          parallelSearch(buf, pattern, startIndex, beg, matches - found);
-      if (check.has_value()) {
-        found += std::distance(check.value(), beg);
-        beg = check.value();
-        if (found == matches) {
-          return 1;
-        }
-        return 0;
-      } else
-        return 1;
+          parallelSearch(buf, pattern, startIndex, beg, matches);
+      if (!check.has_value()) return END_STREAM;
+
+      beg = check.value();
+      if (search_count >= matches) return END_STREAM;
+
+      startIndex += chunkSize - pattern.length() + 1;
+      return CONT_STREAM;
     });
 
     return beg;
   }
 
-  // #pfind_unique
-  template <typename OutputItStart>
-  std::optional<OutputItStart> pfind_unique(const std::string &path,
-                                            const std::string &pattern,
-                                            OutputItStart beg,
-                                            int matches = MAX_MATCHES) {
-    OutputItStart start = beg;
-    std::optional<OutputItStart> check = pfind(path, pattern, beg, matches);
-    if (!check.has_value())
-      return {};
-    else
-      beg = check.value();
-
-    std::sort(start, beg);
-    auto en = std::unique(start, beg);
-    return en;
-  }
+  // // #pfind_unique
+  // template <typename OutputItStart>
+  // std::optional<OutputItStart> pfind_unique(const std::string &path,
+  //                                           const std::string &pattern,
+  //                                           OutputItStart beg,
+  //                                           int matches = MAX_MATCHES) {
+  //   OutputItStart start = beg;
+  //   std::optional<OutputItStart> check = pfind(path, pattern, beg, matches);
+  //   if (!check.has_value())
+  //     return {};
+  //   else
+  //     beg = check.value();
+  //
+  //   std::sort(start, beg);
+  //   auto en = std::unique(start, beg);
+  //   return en;
+  // }
 
   // #search
   template <typename OutputItStart>
   int search(const std::string &text, const std::string &pat, size_t startPos,
              size_t endPos, size_t startIndex, OutputItStart beg,
              int matches = MAX_MATCHES) {
+    assert(startPos >= 0 && startPos <= text.length());
+    assert(endPos >= 0 && endPos <= text.length());
+    assert(startPos <= endPos);
+
     const size_t patlen = pat.length();
     const size_t textlen = text.length();
 
-    bpos.resize(patlen + 1), shift.resize(patlen + 1);
+    bpos.resize(patlen + 1), shift.resize(patlen + 1, patlen);
 
     badCharHeuristic(pat, patlen);
     preprocess_strong_suffix(pat, patlen);
@@ -157,30 +154,41 @@ class BoyreMoore {
 
     index_t plen = static_cast<index_t>(patlen);
     index_t s = static_cast<index_t>(startPos);
-    index_t j = static_cast<index_t>(j);
     index_t startIdx = static_cast<index_t>(startIndex);
     index_t en = static_cast<index_t>(endPos);
 
-    int found = 0;
+    index_t j;
+
+    int local_iter_count = 0;
+    int fault_cnt = 0;
     while (s <= en - plen) {
+      assert((int) text[s + plen] < 256);
+
+      if (local_iter_count % 100) {
+        if (search_count >= matches) {
+          return search_count;
+        }
+      }
+
       j = plen - 1;
       while (j >= 0 && pat[j] == text[s + j]) --j;
 
       if (j < 0) {
-        *beg = static_cast<size_t>(s + startIndex);
-        beg++;
-
-        if (++found == matches) return found;
+        *beg = static_cast<size_t>(s) + startIndex;
+        ++search_count;
 
         s += std::max(static_cast<index_t>(shift[0]),
                       (s + plen < en ? plen - badchar[text[s + patlen]]
                                      : static_cast<index_t>(1)));
-      } else
+      } else {
+
         s += std::max(
             static_cast<index_t>(shift[j + 1]),
             std::max(static_cast<index_t>(1), j - badchar[text[s + j]]));
+      }
+      ++local_iter_count;
     }
-    return found;
+    return search_count;
   }
 
   // #parallelSearch
@@ -199,26 +207,25 @@ class BoyreMoore {
     const index_t txtlen = static_cast<index_t>(text.length());
     const index_t patlen = static_cast<index_t>(pattern.length());
 
-    const int numThreads = concurrency + (txtlen % concurrency);
+    const int numThreads = concurrency + bool(txtlen % concurrency);
 
     std::vector<std::thread> threads(numThreads);
     std::vector<std::vector<size_t>> results(numThreads);
 
     const size_t part = txtlen / concurrency;
-    int found = 0;
 
     for (int i = 0; i < numThreads; i++) {
       index_t startPos = i * part;
-      index_t endPos = std::min((i + 1) * static_cast<index_t>(part) + patlen - 1, txtlen);
+      index_t endPos =
+          std::min((i + 1) * static_cast<index_t>(part) + patlen - 1, txtlen);
+
+      assert(startPos >= 0 && startPos <= text.length());
+      assert(endPos >= 0 && endPos <= text.length());
+      assert(startPos <= endPos);
 
       threads[i] = std::thread([&, i]() {
-        found += search(text,
-                        pattern, 
-                        startPos,
-                        endPos,
-                        startIndex,
-                        beg,
-                        matches - found);
+        search(text, pattern, startPos, endPos, startIndex, std::back_inserter(results[i]),
+               matches);
       });
     }
 
