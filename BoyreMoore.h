@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -17,6 +18,7 @@
 #define END_STREAM 1
 #define CONT_STREAM 0
 #define MB 1048576
+#define MAX_CHUNK_LIMIT 128 * 1048576
 
 using index_t = std::ptrdiff_t;
 
@@ -45,19 +47,71 @@ class BoyreMoore {
   // references for classical Boyre Moore search preprocessing:
   //   https://www.geeksforgeeks.org/boyer-moore-algorithm-good-suffix-heuristic/
   //   https://www.geeksforgeeks.org/boyer-moore-algorithm-for-pattern-searching/
-  void badCharHeuristic(const std::string &str, size_t size);
-  void preprocess_strong_suffix(const std::string &pat, size_t m);
-  void preprocess_case2(const std::string &pat, size_t m);
+  void badCharHeuristic(const std::string &str, size_t size) {
+    size_t i;
+    for (i = 0; i < size; i++) badchar[(int)str[i]] = i;
+  }
+  void preprocess_strong_suffix(const std::string &pat, size_t m) {
+    index_t i = static_cast<index_t>(m), j = static_cast<index_t>(m + 1);
+    bpos[i] = j;
+    while (i > 0) {
+      while (j <= m && pat[i - 1] != pat[j - 1]) {
+        if (shift[j] == m) shift[j] = j - i;
+        j = bpos[j];
+      }
+      i--;
+      j--;
+      bpos[i] = j;
+    }
+  }
+  void preprocess_case2(const std::string &pat, size_t m) {
+    size_t i, j;
+    j = bpos[0];
+    for (i = 0; i <= m; i++) {
+      if (shift[i] == m) shift[i] = j;
+      if (i == j) j = bpos[j];
+    }
+  }
 
   // > initializes file path.
   // > and sets chunk size to be fetched =  min (passed chunk size, 50 Mb(s)).
   // > opens file.
-  int startStream(const std::string &p);
+  int startStream(const std::string &p) {
+    path = p;
+    chunkSize = std::min(chunkSize, (size_t)MAX_CHUNK_LIMIT);
+    file = std::fstream(path, std::ios::in);
+
+    if (!file) {
+      std::cerr << "startStream: unable to open file\n";
+      return 1;
+    }
+    try {
+      buffer.resize(chunkSize, 'a');
+    } catch (std::length_error) {
+      std::cerr << "startStream: unable to allocate buffer.\n";
+      return 1;
+    }
+    return 0;
+  }
 
   //> reads chunks overlapping by patternlength to avoid search misses.
   //> runs action for each chunk.
   void forStream(size_t patternlen,
-                 const std::function<int(const std::string &)> &action);
+                 const std::function<int(const std::string &)> &action) {
+    if (patternlen == 0) return;
+    buffer.resize(chunkSize + patternlen - 1, 'a');
+
+    if (!file.read(buffer.data(), chunkSize + patternlen - 1)) {
+      std::cerr << "forStream: failed to read from file\n";
+      return;
+    }
+
+    while (file.gcount()) {
+      if (action(buffer) == 1) break;
+      std::memcpy(buffer.data(), buffer.data() + chunkSize, patternlen - 1);
+      file.read(buffer.data() + patternlen - 1, chunkSize);
+    }
+  }
 
   const std::string &getBuf() { return buffer; }
   std::string getPath() { return path; }
@@ -72,7 +126,7 @@ class BoyreMoore {
   };
 
   void set_search_count(size_t n) { search_count = n; }
-  void set_chunk_size(size_t n) {chunkSize = n; }
+  void set_chunk_size(size_t n) { chunkSize = n; }
   // #find
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &path,
@@ -116,7 +170,6 @@ class BoyreMoore {
     return beg;
   }
 
-
   // #search
   template <typename OutputItStart>
   int search(const std::string &text, const std::string &pat, size_t startPos,
@@ -145,7 +198,7 @@ class BoyreMoore {
     int local_iter_count = 0;
     int fault_cnt = 0;
     while (s <= en - plen) {
-      assert((int) text[s + plen] < 256);
+      assert((int)text[s + plen] < 256);
 
       if (local_iter_count % 100) {
         if (search_count >= matches) {
@@ -164,7 +217,6 @@ class BoyreMoore {
                       (s + plen < en ? plen - badchar[text[s + patlen]]
                                      : static_cast<index_t>(1)));
       } else {
-
         s += std::max(
             static_cast<index_t>(shift[j + 1]),
             std::max(static_cast<index_t>(1), j - badchar[text[s + j]]));
@@ -207,8 +259,8 @@ class BoyreMoore {
       assert(startPos <= endPos);
 
       threads[i] = std::thread([&, i]() {
-        search(text, pattern, startPos, endPos, startIndex, std::back_inserter(results[i]),
-               matches);
+        search(text, pattern, startPos, endPos, startIndex,
+               std::back_inserter(results[i]), matches);
       });
     }
 
