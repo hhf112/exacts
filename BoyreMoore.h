@@ -18,8 +18,8 @@
 #define CONT_STREAM 0
 
 #define MAX_MATCHES 1000000
-#define MAX_CHUNK_LIMIT 128 * 1048576
-#define CHECK_TICKER 100
+#define MAX_CHUNK_LIMIT 200 * MB
+#define CHECK_TICKER 10000
 
 using index_t = std::ptrdiff_t;
 
@@ -97,7 +97,7 @@ class BoyreMoore {
 
   const size_t m_nchars = 256;
 
-  size_t m_chunk_size = 5 * MB;
+  size_t m_chunk_size = 4 * MB;
 
   std::string m_path;
   std::string m_buffer;
