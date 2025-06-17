@@ -25,7 +25,7 @@ using index_t = std::ptrdiff_t;
 
 class BoyreMoore {
  public:
-  BoyreMoore(size_t m_nchars) : m_nchars{m_nchars} {
+  BoyreMoore(size_t nchars) : m_nchars{nchars} {
     try {
       m_badchar.resize(m_nchars, -1);
     } catch (std::length_error) {
@@ -34,8 +34,8 @@ class BoyreMoore {
   };
 
   inline void set_search_count(size_t n) { m_search_count = n; }
+  inline int get_search_count() { return m_search_count; }
   inline void set_chunk_size(size_t n) { m_chunk_size = n; }
-
 
   template <typename OutputItStart>
   std::optional<OutputItStart> find(const std::string &m_path,
@@ -63,18 +63,25 @@ class BoyreMoore {
     if (startStream(m_path) == 1) return {};
 
     size_t startIndex = 0;
+    bool fail = 0;
     forStream(pattern.length(), [&](const std::string &buf) {
       std::optional<OutputItStart> check =
           parallelSearch(buf, pattern, startIndex, beg, matches);
-      if (!check.has_value()) return END_STREAM;
+      if (!check.has_value()) {
+        std::cerr << "parallelSearch: failed to search/insert\n";
+        fail = 1;
+        return END_STREAM;
+      }
 
       beg = check.value();
-      if (m_search_count >= matches) return END_STREAM;
-
+      if (m_search_count >= matches) {
+        return END_STREAM;
+      }
       startIndex += m_chunk_size - pattern.length() + 1;
       return CONT_STREAM;
     });
 
+    if (fail) std::cerr << "search failed and was halted intermediately.\n";
     return beg;
   }
 
@@ -95,7 +102,7 @@ class BoyreMoore {
 
   const size_t m_nchars = 256;
 
-  size_t m_chunk_size = 5 * MB;
+  size_t m_chunk_size = 4 * MB;
 
   std::string m_path;
   std::string m_buffer;
@@ -142,7 +149,8 @@ class BoyreMoore {
 
     while (m_file.gcount()) {
       if (action(m_buffer) == 1) break;
-      std::memcpy(m_buffer.data(), m_buffer.data() + m_chunk_size, patternlen - 1);
+      std::memcpy(m_buffer.data(), m_buffer.data() + m_chunk_size,
+                  patternlen - 1);
       m_file.read(m_buffer.data() + patternlen - 1, m_chunk_size);
     }
   }
@@ -157,6 +165,7 @@ template <typename OutputItStart>
 int BoyreMoore::search(const std::string &text, const std::string &pat,
                        size_t startPos, size_t endPos, size_t startIndex,
                        OutputItStart beg, int matches) {
+
   const size_t patlen = pat.length();
   const size_t textlen = text.length();
   m_bpos.resize(patlen + 1), m_shift.resize(patlen + 1, patlen);
@@ -192,7 +201,8 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
       shift_gsfx = static_cast<index_t>(m_shift[0]);
     } else {
       shift_gsfx = static_cast<index_t>(m_shift[j + 1]);
-      shift_bchr = std::max(static_cast<index_t>(1), j - m_badchar[text[s + j]]);
+      shift_bchr =
+          std::max(static_cast<index_t>(1), j - m_badchar[text[s + j]]);
     }
 
     s += std::max(shift_gsfx, shift_bchr);
@@ -205,10 +215,9 @@ template <typename OutputItStart>
 std::optional<OutputItStart> BoyreMoore::parallelSearch(
     const std::string &text, const std::string &pattern, size_t startIndex,
     OutputItStart beg, int matches) {
-
   const int concurrency = std::thread::hardware_concurrency();
   if (!concurrency) {
-    std::cerr << "parallelSearch: No threads available on system.\n";
+    std::cerr << "parallelSearch: No threads available.\n";
     return {};
   }
 
@@ -221,11 +230,12 @@ std::optional<OutputItStart> BoyreMoore::parallelSearch(
   std::vector<std::vector<size_t>> results(numThreads);
 
   const size_t part = txtlen / concurrency;
+  const index_t overlap = patlen - 1;
 
   for (int i = 0; i < numThreads; i++) {
     index_t startPos = i * part;
     index_t endPos =
-        std::min((i + 1) * static_cast<index_t>(part) + patlen - 1, txtlen);
+        std::min((i + 1) * static_cast<index_t>(part) + overlap, txtlen);
 
     threads[i] = std::thread([&, i]() {
       search(text, pattern, startPos, endPos, startIndex,
