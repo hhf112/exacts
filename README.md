@@ -1,4 +1,5 @@
 prototyping under testing branch.
+Documentation to be added soon.
 
 ## Moore Search
 A header only implementation of parallelized Boyre Moore exact string searching algorithm.
@@ -8,7 +9,7 @@ for the benchmark:
 
 1. clone the repo and `cd` into it
 2. run `sh build`
-3. run: `./search <filename> <pattern>`
+3. run: `./search <filename> <pattern> <max search count>`
 
 ### Sample output
 ```
