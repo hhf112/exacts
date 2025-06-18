@@ -53,8 +53,8 @@ found: 10000004
 
 ```
 ### References
-    https://www.geeksforgeeks.org/boyer-moore-algorithm-good-suffix-heuristic/
-    https://www.geeksforgeeks.org/boyer-moore-algorithm-for-pattern-searching/
+https://www.geeksforgeeks.org/boyer-moore-algorithm-good-suffix-heuristic/
+https://www.geeksforgeeks.org/boyer-moore-algorithm-for-pattern-searching/
 
 
 ## Members
