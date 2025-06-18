@@ -1,30 +1,33 @@
 #pragma once
-#include <algorithm>
-#include <atomic>
-#include <cstddef>
-#include <cstring>
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <iterator>
-#include <optional>
-#include <string>
-#include <thread>
-#include <vector>
+#include <atomic>      // for std::atomic
+#include <cstring>     // for std::memcpy
+#include <fstream>     // for std::fstream
+#include <functional>  // for std::function
+#include <iostream>    // for std::cerr
+#include <iterator>    // for std::back_inserter
+#include <optional>    // for std::optional
+#include <string>      // for std::string
+#include <thread>      // for std::thread
+#include <vector>      // for std::vector
 
-#define MB 1048576
-
-#define END_STREAM 1
-#define CONT_STREAM 0
-
+// HARD LIMITS
 #define MAX_MATCHES 1000000
 #define MAX_CHUNK_LIMIT (200 * MB)
 #define CHECK_TICKER 10000
 
+// standard sizes
+#define MB 1048576
+
+// FILE STREAM SIGNALS
+#define END_STREAM 1
+#define CONT_STREAM 0
+
+// typedefs
 using index_t = std::ptrdiff_t;
 
 class BoyreMoore {
  public:
+  /* members */
   struct PatternData {
     std::vector<size_t> shift;
     std::vector<size_t> bpos;
@@ -38,7 +41,7 @@ class BoyreMoore {
     }
   };
 
-  //a better cache storge or a custom one to be implemented.
+  // A better implementation possibly a round robin hashmap
   std::unordered_map<std::string, PatternData> patternCache;
 
   BoyreMoore(int nchars) : m_nchars{nchars} {}
@@ -46,16 +49,22 @@ class BoyreMoore {
     preprocess_pattern(nchars, pattern);
   }
 
+  /* getters and setters */
   inline void set_search_count(size_t n) { m_search_count = n; }
   inline int get_search_count() { return m_search_count; }
   inline void set_chunk_size(size_t n) { m_chunk_size = n; }
 
+  inline std::string &getBuf() { return m_buffer; }
+  inline const std::string &getBufconst() { return m_buffer; }
+  inline std::string getPath() { return m_path; }
+
+  /* functions */
   template <typename OutputItStart>
-  std::optional<OutputItStart> find(const std::string &m_path,
+  inline std::optional<OutputItStart> find(const std::string &path,
                                     const std::string &pattern,
                                     OutputItStart beg,
                                     int matches = MAX_MATCHES) {
-    if (startStream(m_path) == 1) return {};
+    if (startStream(path) == 1) return {};
 
     size_t startIndex = 0;
     forStream(pattern.length(), [&](const std::string &buf) {
@@ -70,11 +79,11 @@ class BoyreMoore {
   }
 
   template <typename OutputItStart>
-  inline std::optional<OutputItStart> pfind(const std::string &m_path,
+  inline std::optional<OutputItStart> pfind(const std::string &path,
                                             const std::string &pattern,
                                             OutputItStart beg,
                                             int matches = MAX_MATCHES) {
-    if (startStream(m_path) == 1) return {};
+    if (startStream(path) == 1) return {};
 
     size_t startIndex = 0;
     bool fail = 0;
@@ -164,7 +173,7 @@ class BoyreMoore {
     return 0;
   }
 
-  void forStream(size_t patternlen,
+  inline void forStream(size_t patternlen,
                  const std::function<int(const std::string &)> &action) {
     if (patternlen == 0) return;
     m_buffer.resize(m_chunk_size + patternlen - 1, 'a');
@@ -181,13 +190,11 @@ class BoyreMoore {
       m_file.read(m_buffer.data() + patternlen - 1, m_chunk_size);
     }
   }
-
-  const std::string &getBuf() { return m_buffer; }
-  std::string getm_path() { return m_path; }
 };
 
 // Implementation details
 //
+// SEARCH
 template <typename OutputItStart>
 int BoyreMoore::search(const std::string &text, const std::string &pat,
                        size_t startPos, size_t endPos, size_t startIndex,
@@ -196,7 +203,6 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
   const size_t textlen = text.length();
 
   preprocess_pattern(m_nchars, pat);
-
   const PatternData &data = patternCache[pat];
 
   const index_t plen = static_cast<index_t>(patlen);
@@ -236,6 +242,7 @@ int BoyreMoore::search(const std::string &text, const std::string &pat,
   return m_search_count;
 }
 
+// PARALLEL_SEARCH
 template <typename OutputItStart>
 std::optional<OutputItStart> BoyreMoore::parallelSearch(
     const std::string &text, const std::string &pattern, size_t startIndex,
@@ -276,6 +283,7 @@ std::optional<OutputItStart> BoyreMoore::parallelSearch(
   return beg;
 }
 
+// PREPROCESSING
 void BoyreMoore::preprocess_strong_suffix(std::vector<size_t> shift,
                                           std::vector<size_t> bpos,
                                           const std::string &pat, size_t m) {
