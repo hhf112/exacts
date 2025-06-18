@@ -1,5 +1,5 @@
 prototyping under testing branch.
-Documentation to be added soon.
+Documentation and tests to be added soon.
 
 ## Moore Search
 A header only implementation of parallelized Boyre Moore exact string searching algorithm.
