@@ -4,9 +4,9 @@ under development. tests to be added.
 ## Moore Search
 A header only implementation of parallelized Boyre Moore exact string searching algorithm. compatible with C++17.
 
-## Benchmark run 
+## Benchmarks
 
-
+## Test run 
 1. clone the repo and `cd` into it
 2. run `sh build`
 3. run: `./search <filename> <pattern> <max search count>`
