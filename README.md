@@ -65,11 +65,10 @@ std::unordered_map<std::string, PatternData> patternCache;
 ### find
 ```cpp
 template <typename OutputItStart>
-std::optional<OutputItStart> 
-find(const std::string &m_path,
-            const std::string &pattern,
-            OutputItStart beg,
-            int matches = MAX_MATCHES);
+std::optional<OutputItStart> find(const std::string &m_path,
+                                  const std::string &pattern,
+                                  OutputItStart beg,
+                                  int matches = MAX_MATCHES);
 
 ```
 ```yaml
