@@ -66,7 +66,7 @@ std::unordered_map<std::string, PatternData> patternCache;
 ### find
 ```cpp
 template <typename OutputItStart>
-inline std::optional<OutputItStart> find(const std::string &m_path,
+inline std::optional<OutputItStart> find(const std::string &path,
                                   const std::string &pattern,
                                   OutputItStart beg,
                                   int matches = MAX_MATCHES);
