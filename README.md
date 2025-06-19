@@ -170,7 +170,7 @@ inline void preprocess_pattern(int nchars, const std::string &pattern);
 ```
 ```yaml
 Params
-nchars    number of badcharcaters
+nchars    number of badcharacters
 pattern   pattern to search for
 ```
 adds preprocessed tables to cache if not existing.
