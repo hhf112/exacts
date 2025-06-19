@@ -32,7 +32,6 @@ found: 10000004
   inline std::string &getBuf() { return m_buffer; }
   inline const std::string &getBufconst() { return m_buffer; }
   inline std::string getPath() { return m_path; }
-
 ```
 ## Nested types
 ### PatternData struct
@@ -49,7 +48,6 @@ found: 10000004
       badchars.resize(nchars, -1);
     }
   };
-
 ```
 #### References
 https://www.geeksforgeeks.org/boyer-moore-algorithm-good-suffix-heuristic/
