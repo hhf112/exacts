@@ -1,6 +1,6 @@
 active development. tests to be added.
 
-# Moore Search
+# Moore Search <img src = "https://img.shields.io/github/actions/workflow/status/hhf112/moore-search/c-cpp.yml" alt="build status">
 A header only implementation of parallelized Boyre Moore exact string searching algorithm. compatible with C++17.
 
 # Benchmarks
@@ -14,7 +14,7 @@ A header only implementation of parallelized Boyre Moore exact string searching 
 build system to be added.
 
 ### Sample output
-```
+```console
 hrsh $(LAPTOP-HK58DTQE):~/dev/moore$🌙 ./srch 800mb.txt example 10000000
 classical search function find: 1446 ms.
 found: 10000000
