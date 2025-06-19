@@ -23,7 +23,7 @@ found: 10000004
 ```
 # Public API
 ## getters and setters 
-```
+```cpp
   inline void set_search_count(size_t n) { m_search_count = n; }
   inline int get_search_count() { return m_search_count; }
   inline void set_chunk_size(size_t n) { m_chunk_size = n; }
@@ -34,7 +34,7 @@ found: 10000004
 ```
 ## Nested types
 ### PatternData struct
-```
+```cpp
   struct PatternData {
     std::vector<size_t> shift;
     std::vector<size_t> bpos;
@@ -56,14 +56,14 @@ https://www.geeksforgeeks.org/boyer-moore-algorithm-for-pattern-searching/
 ## Members
 
 ### patternCache
-```
+```cpp
 std::unordered_map<std::string, PatternData> patternCache;
 ```
 #### Note
  A better implementation possibly a round robin hashmap to be added.
 ## Functions
 ### find
-```
+```cpp
 std::optional<OutputItStart> 
 find(const std::string &m_path,
             const std::string &pattern,
@@ -86,7 +86,7 @@ May return repeated indexes due to overlapped chunks to avoid search misses
 
 ### pfind: threaded find
 
-```
+```cpp
 inline std::optional<OutputItStart> pfind(const std::string &path,
                                         const std::string &pattern,
                                         OutputItStart beg,
@@ -109,7 +109,7 @@ appends all matches found into container iterated by beg until specified matches
 
 ### search
 
-```
+```cpp
 template <typename OutputItStart> 
 inline int search(const std::string &text,
                     const std::string &pat,
@@ -133,7 +133,7 @@ Return          number of matches
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 
 ### parallelSearch: threaded search
-```
+```cpp
 template <typename OutputItStart> inline std::optional<OutputItStart> 
 parallelSearch(const std::string &text,
                 const std::string &pattern,
@@ -157,7 +157,7 @@ fail            {}
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 
 ### preprocess_pattern
-```
+```cpp
 inline void preprocess_pattern(int nchars, const std::string &pattern);
 
 Params
