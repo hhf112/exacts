@@ -116,14 +116,13 @@ appends all matches found into container iterated by beg until specified matches
 ### search
 
 ```cpp
-template <typename OutputItStart> 
-inline int search(const std::string &text,
-                    const std::string &pat,
-                    size_t startPos,
-                    size_t endPos,
-                    size_t startIndex,
-                    OutputItStart beg,
-                    int matches = MAX_MATCHES);
+template <typename OutputItStart>  inline int search(const std::string &text,
+                                                    const std::string &pat,
+                                                    size_t startPos,
+                                                    size_t endPos,
+                                                    size_t startIndex,
+                                                    OutputItStart beg,
+                                                    int matches = MAX_MATCHES);
 ```
 ```yaml
 Params
