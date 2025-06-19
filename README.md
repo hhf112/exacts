@@ -64,12 +64,15 @@ std::unordered_map<std::string, PatternData> patternCache;
 ## Functions
 ### find
 ```cpp
+template <typename OutputItStart>
 std::optional<OutputItStart> 
 find(const std::string &m_path,
             const std::string &pattern,
             OutputItStart beg,
             int matches = MAX_MATCHES);
 
+```
+```yaml
 Params
 path       file path to search in
 pattern    pattern to search for
@@ -80,6 +83,10 @@ Return
 success    beg translated by number of matches appended on success
 fail       {}
 ```
+
+
+
+
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 #### Notes
 May return repeated indexes due to overlapped chunks to avoid search misses
@@ -87,6 +94,7 @@ May return repeated indexes due to overlapped chunks to avoid search misses
 ### pfind: threaded find
 
 ```cpp
+template <typename OutputItStart>
 inline std::optional<OutputItStart> pfind(const std::string &path,
                                         const std::string &pattern,
                                         OutputItStart beg,
