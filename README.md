@@ -4,6 +4,7 @@ active development. tests to be added.
 A header only implementation of parallelized Boyre Moore exact string searching algorithm. compatible with C++17.
 
 # Benchmarks
+to be added.
 
 # Test run 
 1. clone the repo and `cd` into it
