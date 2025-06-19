@@ -1,5 +1,4 @@
-under development. tests to be added.
-
+active development. tests to be added.
 
 # Moore Search
 A header only implementation of parallelized Boyre Moore exact string searching algorithm. compatible with C++17.
@@ -65,10 +64,11 @@ std::unordered_map<std::string, PatternData> patternCache;
 ## Functions
 ### find
 ```
-std::optional<OutputItStart> find(const std::string &m_path,
-                                const std::string &pattern,
-                                OutputItStart beg,
-                                int matches = MAX_MATCHES);
+std::optional<OutputItStart> 
+find(const std::string &m_path,
+            const std::string &pattern,
+            OutputItStart beg,
+            int matches = MAX_MATCHES);
 
 Params
 path       file path to search in
@@ -87,20 +87,20 @@ May return repeated indexes due to overlapped chunks to avoid search misses
 ### pfind: threaded find
 
 ```
-    inline std::optional<OutputItStart> pfind(const std::string &path,
-                                            const std::string &pattern,
-                                            OutputItStart beg,
-                                            int matches = MAX_MATCHES);
+inline std::optional<OutputItStart> pfind(const std::string &path,
+                                        const std::string &pattern,
+                                        OutputItStart beg,
+                                        int matches = MAX_MATCHES);
 
-    Params
-    path       file path to search in
-    pattern    pattern to search for
-    beg        input iterator of the container matches are appended to
-    matches    maximum number of matches to be specified [optional]
+Params
+path       file path to search in
+pattern    pattern to search for
+beg        input iterator of the container matches are appended to
+matches    maximum number of matches to be specified [optional]
 
-    Return     
-    success   beg translated by number of matches appended on success
-    fail      {}
+Return     
+success   beg translated by number of matches appended on success
+fail      {}
 ```
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 #### Notes
@@ -110,58 +110,59 @@ appends all matches found into container iterated by beg until specified matches
 ### search
 
 ```
-    template <typename OutputItStart> inline int search(const std::string &text,
-                                                        const std::string &pat,
-                                                        size_t startPos,
-                                                        size_t endPos,
-                                                        size_t startIndex,
-                                                        OutputItStart beg,
-                                                        int matches = MAX_MATCHES);
+template <typename OutputItStart> 
+inline int search(const std::string &text,
+                    const std::string &pat,
+                    size_t startPos,
+                    size_t endPos,
+                    size_t startIndex,
+                    OutputItStart beg,
+                    int matches = MAX_MATCHES);
 
-    Params
-    text           text to search on
-    pat            pattern to search for
-    startPos       search start index inclusive
-    endPos         search end index exclusive
-    startIndex     index to appened on every find
-    beg            input iterator of the container matches are appended to
-    matches        maximum number of matches to look for [optional]
+Params
+text           text to search on
+pat            pattern to search for
+startPos       search start index inclusive
+endPos         search end index exclusive
+startIndex     index to appened on every find
+beg            input iterator of the container matches are appended to
+matches        maximum number of matches to look for [optional]
 
-    Return          number of matches
+Return          number of matches
 ```
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 
 ### parallelSearch: threaded search
 ```
-    template <typename OutputItStart> inline std::optional<OutputItStart> 
-                                    parallelSearch(const std::string &text,
-                                                    const std::string &pattern,
-                                                    size_t startIndex,
-                                                    OutputItStart beg,
-                                                    int matches = MAX_MATCHES);
+template <typename OutputItStart> inline std::optional<OutputItStart> 
+parallelSearch(const std::string &text,
+                const std::string &pattern,
+                size_t startIndex,
+                OutputItStart beg,
+                int matches = MAX_MATCHES);
 
-    Params
-    text           text to search on
-    pat            pattern to search for
-    startPos       search start index inclusive
-    endPos         search end index exclusive
-    startIndex     index to appened on every find
-    beg            input iterator of the container matches are appended to
-    matches        maximum number of matches to look for [optional]
+Params
+text           text to search on
+pat            pattern to search for
+startPos       search start index inclusive
+endPos         search end index exclusive
+startIndex     index to appened on every find
+beg            input iterator of the container matches are appended to
+matches        maximum number of matches to look for [optional]
 
-    Return          
-    success         beg translated by number of matches found
-    fail            {}
+Return          
+success         beg translated by number of matches found
+fail            {}
 ```
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 
 ### preprocess_pattern
 ```
-    inline void preprocess_pattern(int nchars, const std::string &pattern);
+inline void preprocess_pattern(int nchars, const std::string &pattern);
 
-    Params
-    nchars    number of badcharcaters
-    pattern   pattern to search for
+Params
+nchars    number of badcharcaters
+pattern   pattern to search for
 ```
 adds preprocessed tables to cache if not existing.
 
