@@ -82,10 +82,6 @@ Return
 success    beg translated by number of matches appended on success
 fail       {}
 ```
-
-
-
-
 appends all matches found into container iterated by beg until specified matches are found or eof encountered
 #### Notes
 May return repeated indexes due to overlapped chunks to avoid search misses
@@ -99,6 +95,9 @@ inline std::optional<OutputItStart> pfind(const std::string &path,
                                         OutputItStart beg,
                                         int matches = MAX_MATCHES);
 
+
+```
+```yaml
 Params
 path       file path to search in
 pattern    pattern to search for
@@ -125,7 +124,8 @@ inline int search(const std::string &text,
                     size_t startIndex,
                     OutputItStart beg,
                     int matches = MAX_MATCHES);
-
+```
+```yaml
 Params
 text           text to search on
 pat            pattern to search for
@@ -147,7 +147,8 @@ parallelSearch(const std::string &text,
                 size_t startIndex,
                 OutputItStart beg,
                 int matches = MAX_MATCHES);
-
+```
+```yaml
 Params
 text           text to search on
 pat            pattern to search for
@@ -166,7 +167,8 @@ appends all matches found into container iterated by beg until specified matches
 ### preprocess_pattern
 ```cpp
 inline void preprocess_pattern(int nchars, const std::string &pattern);
-
+```
+```yaml
 Params
 nchars    number of badcharcaters
 pattern   pattern to search for
