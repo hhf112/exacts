@@ -60,7 +60,7 @@ class BoyreMoore {
 
   /* functions */
   template <typename OutputItStart>
-  std::optional<OutputItStart> find(const std::string &path,
+  inline std::optional<OutputItStart> find(const std::string &path,
                                     const std::string &pattern,
                                     OutputItStart beg,
                                     int matches = MAX_MATCHES) {
@@ -173,7 +173,7 @@ class BoyreMoore {
     return 0;
   }
 
-  void forStream(size_t patternlen,
+  inline void forStream(size_t patternlen,
                  const std::function<int(const std::string &)> &action) {
     if (patternlen == 0) return;
     m_buffer.resize(m_chunk_size + patternlen - 1, 'a');
