@@ -1,1 +1,1 @@
-g++ -std=c++17 -pthread benchmark.cpp -o srch
+g++ -std=c++17 -pthread test.cpp -o srch

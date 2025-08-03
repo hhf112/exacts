@@ -166,7 +166,6 @@ class Bm {
       int nchars = 256, int matches = MAX_MATCHES) {
     if (m_streamer.startStream(path) == 1) return {};
 
-    size_t startIndex = 0;
     bool fail = 0;
     m_streamer.forStream(pattern.length(), [&](const std::string &buf) {
       int chk = parallelSearch(buf, pattern, action, nchars, matches);
@@ -178,7 +177,6 @@ class Bm {
       if (m_search_count >= matches) {
         return PatStreamer::END_STREAM;
       }
-      startIndex += m_streamer.getChunkSize() - pattern.length() + 1;
       return PatStreamer::CONT_STREAM;
     });
 
