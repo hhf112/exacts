@@ -151,7 +151,14 @@ class Bm {
   /* @brief by value */
   inline int get_search_count() { return m_search_count; }
 
-  /* UNDER TESTING
+  /*
+   * @brief run {action} for every occurance in buffer
+   * @params {action(it, en)}:
+   *     @params {it} iterator to occurance
+   *     @params {en} iterator to end of buffer
+   *
+   * @note occurances may be random and repeated
+   */
   inline int pfind(
       const std::string &path, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
@@ -162,7 +169,7 @@ class Bm {
     size_t startIndex = 0;
     bool fail = 0;
     m_streamer.forStream(pattern.length(), [&](const std::string &buf) {
-      int chk = parallelSearch(buf, pattern, startIndex, action, matches);
+      int chk = parallelSearch(buf, pattern, action, nchars, matches);
       if (chk < 0) {
         std::cerr << "pfind: parallelSearch failed.\n";
         return PatStreamer::END_STREAM;
@@ -178,7 +185,6 @@ class Bm {
     if (fail) std::cerr << "search failed and was halted intermediately.\n";
     return m_search_count;
   }
-  */
 
   /*
    * @brief run {action} for every occurance in each buffer
@@ -195,8 +201,7 @@ class Bm {
 
     size_t startIndex = 0;
     m_streamer.forStream(pattern.length(), [&](const std::string &buf) {
-      search(buf, pattern, 0, buf.length(), action, nchars, startIndex,
-             matches);
+      search(buf, pattern, 0, buf.length(), action, nchars, matches);
       if (m_search_count >= matches) return PatStreamer::END_STREAM;
       startIndex += m_streamer.getChunkSize() - pattern.length() + 1;
 
@@ -207,9 +212,8 @@ class Bm {
     return m_search_count;
   }
 
-
   /*
-   * @brief run {action} for every occurance int {text}
+   * @brief run {action} for every occurance in {text}
    * @params {action(it, en)}:
    *     @params {it} iterator to occurance
    *     @params {en} iterator to end of {text}
@@ -217,10 +221,10 @@ class Bm {
    * @note occurances may be random and repeated
    */
   inline int parallelSearch(
-      const std::string &text, const std::string &pattern, 
+      const std::string &text, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int  nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
+      int nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
     const int concurrency = std::thread::hardware_concurrency();
     if (!concurrency) {
       std::cerr << "parallelSearch: No threads available.\n";
@@ -244,16 +248,16 @@ class Bm {
           std::min((i + 1) * static_cast<index_t>(part) + overlap, txtlen);
 
       threads[i] = std::thread([&, i]() {
-        search(text, pattern, startPos, endPos, action, nchars, startIndex, matches);
+        search(text, pattern, startPos, endPos, action, nchars, matches);
       });
     }
 
-    for (int i = 0; i<numThreads; i++) threads[i].join();
+    for (int i = 0; i < numThreads; i++) threads[i].join();
     return m_search_count;
   }
 
   /*
-   * @brief run {action} for every occurance int {text}
+   * @brief run {action} for every occurance in {text}
    * @params {action(it, en)}:
    *     @params {it} iterator to occurance
    *     @params {en} iterator to end of {text}
@@ -263,14 +267,13 @@ class Bm {
       size_t endPos,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int nchars = 256, size_t startIndex = 0, int matches = MAX_MATCHES) {
+      int nchars = 256, int matches = MAX_MATCHES) {
     const size_t patlen = pat.length();
     const size_t textlen = text.length();
 
     const PreProced &data = m_registry.getPreProced(nchars, pat);
 
     const index_t plen = static_cast<index_t>(patlen);
-    const index_t startIdx = static_cast<index_t>(startIndex);
 
     index_t s = static_cast<index_t>(startPos);
     index_t en = static_cast<index_t>(endPos);
@@ -305,7 +308,6 @@ class Bm {
     }
     return m_search_count;
   }
-
 
  private:
   PreProcFact m_registry;
