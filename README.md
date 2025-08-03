@@ -1,5 +1,4 @@
-under development. tests to be added. <br>
-squashed and organised commit history: 12-07-2025::02:39
+under development. currently pfind is broken due to breaking changes will fix and update soon. <br>
 
 # Moore Search <img src = "https://img.shields.io/github/actions/workflow/status/hhf112/moore-search/c-cpp.yml" alt="build status">
 A header only implementation of parallelized Boyre Moore exact string searching algorithm. compatible with C++17.
