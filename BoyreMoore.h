@@ -207,6 +207,51 @@ class Bm {
     return m_search_count;
   }
 
+
+  /*
+   * @brief run {action} for every occurance int {text}
+   * @params {action(it, en)}:
+   *     @params {it} iterator to occurance
+   *     @params {en} iterator to end of {text}
+   *
+   * @note occurances may be random and repeated
+   */
+  inline int parallelSearch(
+      const std::string &text, const std::string &pattern, 
+      const std::function<void(std::string::const_iterator it,
+                               std::string::const_iterator en)> &action,
+      int  nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
+    const int concurrency = std::thread::hardware_concurrency();
+    if (!concurrency) {
+      std::cerr << "parallelSearch: No threads available.\n";
+      return -1;
+    }
+
+    const index_t txtlen = static_cast<index_t>(text.length());
+    const index_t patlen = static_cast<index_t>(pattern.length());
+
+    const int numThreads = concurrency + bool(txtlen % concurrency);
+
+    std::vector<std::thread> threads(numThreads);
+    std::vector<std::vector<size_t>> results(numThreads);
+
+    const size_t part = txtlen / concurrency;
+    const index_t overlap = patlen - 1;
+
+    for (int i = 0; i < numThreads; i++) {
+      index_t startPos = i * part;
+      index_t endPos =
+          std::min((i + 1) * static_cast<index_t>(part) + overlap, txtlen);
+
+      threads[i] = std::thread([&, i]() {
+        search(text, pattern, startPos, endPos, action, nchars, startIndex, matches);
+      });
+    }
+
+    for (int i = 0; i<numThreads; i++) threads[i].join();
+    return m_search_count;
+  }
+
   /*
    * @brief run {action} for every occurance int {text}
    * @params {action(it, en)}:
@@ -261,43 +306,6 @@ class Bm {
     return m_search_count;
   }
 
-  /* UNDER TESTING
-  inline int parallelSearch(
-      const std::string &text, const std::string &pattern, size_t startIndex,
-      const std::function<void(std::string::const_iterator it,
-                               std::string::const_iterator en)> &action,
-      int nchars = 256, int matches = MAX_MATCHES) {
-    const int concurrency = std::thread::hardware_concurrency();
-    if (!concurrency) {
-      std::cerr << "parallelSearch: No threads available.\n";
-      return -1;
-    }
-
-    const index_t txtlen = static_cast<index_t>(text.length());
-    const index_t patlen = static_cast<index_t>(pattern.length());
-
-    const int numThreads = concurrency + bool(txtlen % concurrency);
-
-    std::vector<std::thread> threads(numThreads);
-    std::vector<std::vector<size_t>> results(numThreads);
-
-    const size_t part = txtlen / concurrency;
-    const index_t overlap = patlen - 1;
-
-    for (int i = 0; i < numThreads; i++) {
-      index_t startPos = i * part;
-      index_t endPos =
-          std::min((i + 1) * static_cast<index_t>(part) + overlap, txtlen);
-
-      threads[i] = std::thread([&, i]() {
-        search(text, pattern, startPos, endPos, action, nchars, matches);
-      });
-    }
-
-    for (int i = 0; i<numThreads; i++) threads[i].join();
-    return m_search_count;
-  }
-  */
 
  private:
   PreProcFact m_registry;
