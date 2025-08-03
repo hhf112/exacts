@@ -25,12 +25,23 @@
 // typedefs
 using index_t = std::ptrdiff_t;
 
+struct PatternData {
+  std::vector<size_t> shift, bpos;
+  std::vector<index_t> badchars;
+
+  PatternData() = default;
+  PatternData(int nchars, size_t patternlen) {
+    shift.resize(patternlen + 1);
+    bpos.resize(patternlen + 1);
+    badchars.resize(nchars, -1);
+  }
+};
+
 class BoyreMoore {
  public:
   /* members */
   struct PatternData {
-    std::vector<size_t> shift;
-    std::vector<size_t> bpos;
+    std::vector<size_t> shift, bpos;
     std::vector<index_t> badchars;
 
     PatternData() = default;
@@ -61,9 +72,9 @@ class BoyreMoore {
   /* functions */
   template <typename OutputItStart>
   inline std::optional<OutputItStart> find(const std::string &path,
-                                    const std::string &pattern,
-                                    OutputItStart beg,
-                                    int matches = MAX_MATCHES) {
+                                           const std::string &pattern,
+                                           OutputItStart beg,
+                                           int matches = MAX_MATCHES) {
     if (startStream(path) == 1) return {};
 
     size_t startIndex = 0;
@@ -146,13 +157,13 @@ class BoyreMoore {
   // references for classical Boyre Moore search preprocessing:
   //   https://www.geeksforgeeks.org/boyer-moore-algorithm-good-suffix-heuristic/
   //   https://www.geeksforgeeks.org/boyer-moore-algorithm-for-pattern-searching/
-  inline void badCharHeuristic(std::vector<index_t> badhcars,
+  inline void badCharHeuristic(std::vector<index_t>& badhcars,
                                const std::string &str, size_t size);
-  inline void preprocess_strong_suffix(std::vector<size_t> shift,
-                                       std::vector<size_t> bpos,
+  inline void preprocess_strong_suffix(std::vector<size_t>& shift,
+                                       std::vector<size_t>& bpos,
                                        const std::string &pat, size_t m);
-  inline void preprocess_case2(std::vector<size_t> shift,
-                               std::vector<size_t> bpos, const std::string &pat,
+  inline void preprocess_case2(std::vector<size_t>& shift,
+                               std::vector<size_t>& bpos, const std::string &pat,
                                size_t m);
 
   int startStream(const std::string &p) {
@@ -165,7 +176,7 @@ class BoyreMoore {
       return 1;
     }
     try {
-      m_buffer.resize(m_chunk_size, 'a');
+      m_buffer.resize(m_chunk_size);
     } catch (std::length_error) {
       std::cerr << "startStream: unable to allocate buffer.\n";
       return 1;
@@ -173,13 +184,27 @@ class BoyreMoore {
     return 0;
   }
 
+  /**
+   * executes action for each overlapping chunk read from m_file.
+   * chunks are overlapped backwards by patternlen - 1.
+   * Call startStream
+   * breohrd to set m_file and check stream health.
+   *
+   * @params patternlen patternlength
+   * @params action: action lambda
+   */
   inline void forStream(size_t patternlen,
-                 const std::function<int(const std::string &)> &action) {
-    if (patternlen == 0) return;
-    m_buffer.resize(m_chunk_size + patternlen - 1, 'a');
+                        const std::function<int(const std::string &)> &action) {
+    if (patternlen == 0) {
+      std::cerr << "forStream: null pattern length.";
+      return;
+    }
+
+    m_buffer.resize(m_chunk_size + patternlen - 1);
 
     if (!m_file.read(m_buffer.data(), m_chunk_size + patternlen - 1)) {
-      std::cerr << "forStream: failed to read from m_file\n";
+      std::cerr << "forStream: failed to read " << m_chunk_size + patternlen - 1
+                << " bytes from m_file\n";
       return;
     }
 
@@ -284,8 +309,8 @@ std::optional<OutputItStart> BoyreMoore::parallelSearch(
 }
 
 // PREPROCESSING
-void BoyreMoore::preprocess_strong_suffix(std::vector<size_t> shift,
-                                          std::vector<size_t> bpos,
+void BoyreMoore::preprocess_strong_suffix(std::vector<size_t>& shift,
+                                          std::vector<size_t>& bpos,
                                           const std::string &pat, size_t m) {
   size_t i, j;
   j = bpos[0];
@@ -295,14 +320,14 @@ void BoyreMoore::preprocess_strong_suffix(std::vector<size_t> shift,
   }
 }
 
-void BoyreMoore::badCharHeuristic(std::vector<index_t> badhcars,
+void BoyreMoore::badCharHeuristic(std::vector<index_t>& badhcars,
                                   const std::string &str, size_t size) {
   size_t i;
   for (i = 0; i < size; i++) badhcars[(int)str[i]] = i;
 }
 
-void BoyreMoore::preprocess_case2(std::vector<size_t> shift,
-                                  std::vector<size_t> bpos,
+void BoyreMoore::preprocess_case2(std::vector<size_t>& shift,
+                                  std::vector<size_t>& bpos,
                                   const std::string &pat, size_t m) {
   index_t i = static_cast<index_t>(m), j = static_cast<index_t>(m + 1);
   bpos[i] = j;
