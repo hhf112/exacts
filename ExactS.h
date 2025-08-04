@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>      //  std::atomic
+#include <climits>     // LLONG_MAX
 #include <cstring>     //  std::memcpy
 #include <fstream>     //  std::fstream
 #include <functional>  //  std::function
@@ -10,7 +11,7 @@
 
 namespace hhf112 {
 // GOLBAL typedefs
-using index_t = std::ptrdiff_t;
+using arith_t = std::ptrdiff_t;
 
 class Streamer {
  public:
@@ -21,7 +22,6 @@ class Streamer {
 
   inline void endStream() { file_.close(); }
   inline int getChunkSize() { return chunk_size_; }
-
 
   /*
    * @brief set file stream, moderate passed chunk size
@@ -39,8 +39,9 @@ class Streamer {
   }
 
   /*
-   * @brief run action for every chunk read. copy trailing {overlap} length of each chunk to the front.
-   *@detail first is read is chunk_size + overlap 
+   * @brief run action for every chunk read. copy trailing {overlap} length of
+   *each chunk to the front.
+   *@detail first is read is chunk_size + overlap
    */
   inline int forStream(size_t overlap,
                        const std::function<int(const std::string &)> &action) {
@@ -50,7 +51,7 @@ class Streamer {
     } catch (std::bad_alloc &b) {
       std::cerr << "forStream: caught exception std::bad_alloc\n";
       return -1;
-    } catch (std::length_error& l) {
+    } catch (std::length_error &l) {
       std::cerr << "forStream: caught exception std::length_error\n";
     }
 
@@ -82,7 +83,7 @@ class Streamer {
 
 struct PreProced {
   std::vector<size_t> shift, bpos;
-  std::vector<index_t> badchars;
+  std::vector<arith_t> badchars;
   int NCHARS;
 
   PreProced() = default;
@@ -124,7 +125,7 @@ class PreProcFactory {
     }
   }
 
-  inline void badCharHeuristic(std::vector<index_t> &badhcars,
+  inline void badCharHeuristic(std::vector<arith_t> &badhcars,
                                const std::string &str, size_t size) {
     size_t i;
     for (i = 0; i < size; i++) badhcars[(int)str[i]] = i;
@@ -133,7 +134,7 @@ class PreProcFactory {
   inline void preprocess_case2(std::vector<size_t> &shift,
                                std::vector<size_t> &bpos,
                                const std::string &pat, size_t m) {
-    index_t i = static_cast<index_t>(m), j = static_cast<index_t>(m + 1);
+    arith_t i = static_cast<arith_t>(m), j = static_cast<arith_t>(m + 1);
     bpos[i] = j;
     while (i > 0) {
       while (j <= m && pat[i - 1] != pat[j - 1]) {
@@ -177,6 +178,7 @@ class ExactS {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
+    if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
     if (streamer_.startStream(path) == 1) return -1;
 
     bool fail = 0;
@@ -205,6 +207,7 @@ class ExactS {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
+    if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
     if (streamer_.startStream(path) == 1) return -1;
 
     int status =
@@ -231,24 +234,23 @@ class ExactS {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
+    if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
+
     const int concurrency = std::thread::hardware_concurrency();
     if (!concurrency) return -1;
-    const index_t txtlen = static_cast<index_t>(text.length());
-    const index_t patlen = static_cast<index_t>(pattern.length());
+    const size_t ntext = text.length();
+    const arith_t m = pattern.length();
 
-    const int numThreads = concurrency + bool(txtlen % concurrency);
+    const int numThreads = concurrency + bool(ntext % concurrency);
 
     std::vector<std::thread> threads(numThreads);
-    std::vector<std::vector<size_t>> results(numThreads);
 
-    const size_t part = txtlen / concurrency;
-    const index_t overlap = patlen - 1;
-
+    const size_t part = ntext / concurrency;
+    const arith_t overlap = m - 1;
     int cur = 0;
     for (auto &thread : threads) {
-      index_t startPos = cur * part;
-      index_t endPos =
-          std::min((cur + 1) * static_cast<index_t>(part) + overlap, txtlen);
+      arith_t startPos = cur * part;
+      arith_t endPos = std::min((cur + 1) * part + overlap, ntext);
 
       thread = std::thread([&, startPos, endPos]() {
         search(text, pattern, startPos, endPos, action, nchars, matches);
@@ -267,23 +269,22 @@ class ExactS {
    *     @params {en} iterator to end of {text}
    */
   inline int search(
-      const std::string &text, const std::string &pat, size_t startPos,
+      const std::string &text, const std::string &pattern, size_t startPos,
       size_t endPos,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
-    const PreProced &data = registry_.getPreProced(nchars, pat);
+    if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
+    const PreProced &data = registry_.getPreProced(nchars, pattern);
 
-    const size_t patlen = pat.length();
-    const size_t textlen = text.length();
-    const index_t plen = static_cast<index_t>(patlen);
-    index_t s = static_cast<index_t>(startPos);
-    index_t en = static_cast<index_t>(endPos);
-    index_t j, shift_gsfx, shift_bchr;
+    const arith_t m = pattern.length();
+    const size_t n = text.length();
+    size_t s = startPos, en = endPos;
+    arith_t j, shift_gsfx, shift_bchr;
 
-    while (s <= en - plen) {
-      j = plen - 1;
-      while (j >= 0 && pat[j] == text[s + j]) --j;
+    while (s <= en - m) {
+      j = m - 1;
+      while (j >= 0 && pattern[j] == text[s + j]) --j;
 
       if (j < 0) {
         action(text.begin() + s, text.end());
@@ -292,13 +293,13 @@ class ExactS {
           return search_count_;
         }
 
-        shift_bchr = (s + plen < en) ? plen - data.badchars[text[s + patlen]]
-                                     : static_cast<index_t>(1);
-        shift_gsfx = static_cast<index_t>(data.shift[0]);
+        shift_bchr = (s + m < en) ? m - data.badchars[text[s + m]]
+                                  : static_cast<arith_t>(1);
+        shift_gsfx = data.shift[0];
       } else {
-        shift_gsfx = static_cast<index_t>(data.shift[j + 1]);
+        shift_gsfx = data.shift[j + 1];
         shift_bchr =
-            std::max(static_cast<index_t>(1), j - data.badchars[text[s + j]]);
+            std::max(static_cast<arith_t>(1), j - data.badchars[text[s + j]]);
       }
 
       s += std::max(shift_gsfx, shift_bchr);
