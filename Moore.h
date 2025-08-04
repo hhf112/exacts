@@ -14,28 +14,28 @@ namespace hhf112 {
 // GOLBAL typedefs
 using index_t = std::ptrdiff_t;
 
-class PatStreamer {
+class Streamer {
  public:
   static constexpr int MB = 1048576;
-  static constexpr int MAX_CHUNK_LIMIT = 200;
+  static constexpr int MAX_CHUNK_LIMIT = 200 * MB;
   static constexpr int END_STREAM = 1;
   static constexpr int CONT_STREAM = 0;
 
-  inline void endStream() { m_file.close(); }
-  inline int getChunkSize() { return m_chunk_size; }
+  inline void endStream() { file_.close(); }
+  inline int getChunkSize() { return chunk_size_; }
   inline int startStream(const std::string &p) {
-    m_path = p;
-    m_chunk_size = std::min(m_chunk_size, (size_t)MAX_CHUNK_LIMIT);
-    m_file = std::fstream(m_path, std::ios::in);
+    path_ = p;
+    chunk_size_ = std::min(chunk_size_, (size_t)MAX_CHUNK_LIMIT);
+    file_ = std::fstream(path_, std::ios::in);
 
-    if (!m_file) {
-      std::cerr << "startStream: unable to open file\n";
+    if (!file_) {
+      std::cerr << "startStream: unable to open file_\n";
       return 1;
     }
     try {
-      m_buffer.resize(m_chunk_size);
+      buffer_.resize(chunk_size_);
     } catch (std::length_error) {
-      std::cerr << "startStream: unable to allocate buffer.\n";
+      std::cerr << "startStream: unable to allocate buffer_.\n";
       return 1;
     }
     return 0;
@@ -48,27 +48,26 @@ class PatStreamer {
       return;
     }
 
-    m_buffer.resize(m_chunk_size + patternlen - 1);
+    buffer_.resize(chunk_size_ + patternlen - 1);
 
-    if (!m_file.read(m_buffer.data(), m_chunk_size + patternlen - 1)) {
-      std::cerr << "forStream: failed to read " << m_chunk_size + patternlen - 1
-                << " bytes from m_file\n";
+    if (!file_.read(buffer_.data(), chunk_size_ + patternlen - 1)) {
+      std::cerr << "forStream: failed to read " << chunk_size_ + patternlen - 1
+                << " bytes from file_\n";
       return;
     }
 
-    while (m_file.gcount()) {
-      if (action(m_buffer) == 1) break;
-      std::memcpy(m_buffer.data(), m_buffer.data() + m_chunk_size,
-                  patternlen - 1);
-      m_file.read(m_buffer.data() + patternlen - 1, m_chunk_size);
+    while (file_.gcount()) {
+      if (action(buffer_) == 1) break;
+      std::memcpy(buffer_.data(), buffer_.data() + chunk_size_, patternlen - 1);
+      file_.read(buffer_.data() + patternlen - 1, chunk_size_);
     }
   }
 
  private:
-  std::fstream m_file;
-  std::string m_path;
-  std::string m_buffer;
-  size_t m_chunk_size = 2 * MB;
+  std::fstream file_;
+  std::string path_;
+  std::string buffer_;
+  size_t chunk_size_ = 2 * MB;
 };
 
 struct PreProced {
@@ -84,12 +83,12 @@ struct PreProced {
   }
 };
 
-class PreProcFact {
+class PreProcFactory {
  public:
-  PreProcFact() = default;
+  PreProcFactory() = default;
 
   inline const PreProced &getPreProced(int nchars, const std::string &str) {
-    if (m_record.count(str)) return m_record[str];
+    if (record_.count(str)) return record_[str];
 
     int n = str.length();
     PreProced data(nchars, str.length());
@@ -97,12 +96,12 @@ class PreProcFact {
     preprocess_strong_suffix(data.shift, data.bpos, str, n);
     preprocess_case2(data.shift, data.bpos, str, n);
 
-    auto [newData, _] = m_record.emplace(str, std::move(data));
+    auto [newData, _] = record_.emplace(str, std::move(data));
     return newData->second;
   }
 
  private:
-  std::unordered_map<std::string, PreProced> m_record;
+  std::unordered_map<std::string, PreProced> record_;
   inline void preprocess_strong_suffix(std::vector<size_t> &shift,
                                        std::vector<size_t> &bpos,
                                        const std::string &pat, size_t m) {
@@ -139,17 +138,16 @@ class PreProcFact {
 
 class Bm {
  public:
-  static constexpr int MAX_MATCHES = 10000000;
-  static constexpr int CHECK_TICKER = 10000;
+  static constexpr int MAX_MATCHES = 1000000;
 
   // CONSTRUCTOR
   Bm() = default;
 
   // API
-  /* @brief search_count is atomic */
-  inline void set_search_count(size_t n) { m_search_count = n; }
+  /* @brief search_count_ is atomic */
+  inline void set_search_count_(size_t n) { search_count_.store(n); }
   /* @brief by value */
-  inline int get_search_count() { return m_search_count; }
+  inline int get_search_count() { return search_count_.load(); }
 
   /*
    * @brief run {action} for every occurance in buffer
@@ -164,24 +162,20 @@ class Bm {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
-    if (m_streamer.startStream(path) == 1) return {};
+    if (streamer_.startStream(path) == 1) return -1;
 
     bool fail = 0;
-    m_streamer.forStream(pattern.length(), [&](const std::string &buf) {
-      int chk = parallelSearch(buf, pattern, action, nchars, matches);
-      if (chk < 0) {
-        std::cerr << "pfind: parallelSearch failed.\n";
-        return PatStreamer::END_STREAM;
+    streamer_.forStream(pattern.length(), [&](const std::string &buf) {
+      if (done_.load()) return Streamer::END_STREAM;
+      if (parallelSearch(buf, pattern, action, nchars, matches) < 0) {
+        fail = 1;
+        return Streamer::END_STREAM;
       }
-
-      if (m_search_count >= matches) {
-        return PatStreamer::END_STREAM;
-      }
-      return PatStreamer::CONT_STREAM;
+      return Streamer::CONT_STREAM;
     });
 
-    if (fail) std::cerr << "search failed and was halted intermediately.\n";
-    return m_search_count;
+    if (fail) return -1;
+    return search_count_.load();
   }
 
   /*
@@ -195,19 +189,15 @@ class Bm {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
-    if (m_streamer.startStream(path) == 1) return {};
+    if (streamer_.startStream(path) == 1) return -1;
 
-    size_t startIndex = 0;
-    m_streamer.forStream(pattern.length(), [&](const std::string &buf) {
+    streamer_.forStream(pattern.length(), [&](const std::string &buf) {
+      if (done_.load()) return Streamer::END_STREAM;
       search(buf, pattern, 0, buf.length(), action, nchars, matches);
-      if (m_search_count >= matches) return PatStreamer::END_STREAM;
-      startIndex += m_streamer.getChunkSize() - pattern.length() + 1;
-
-      return PatStreamer::CONT_STREAM;
+      return Streamer::CONT_STREAM;
     });
 
-    m_streamer.endStream();
-    return m_search_count;
+    return search_count_;
   }
 
   /*
@@ -224,11 +214,7 @@ class Bm {
                                std::string::const_iterator en)> &action,
       int nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
     const int concurrency = std::thread::hardware_concurrency();
-    if (!concurrency) {
-      std::cerr << "parallelSearch: No threads available.\n";
-      return -1;
-    }
-
+    if (!concurrency) return -1;
     const index_t txtlen = static_cast<index_t>(text.length());
     const index_t patlen = static_cast<index_t>(pattern.length());
 
@@ -240,18 +226,20 @@ class Bm {
     const size_t part = txtlen / concurrency;
     const index_t overlap = patlen - 1;
 
-    for (int i = 0; i < numThreads; i++) {
-      index_t startPos = i * part;
+    int cur = 0;
+    for (auto &thread : threads) {
+      index_t startPos = cur * part;
       index_t endPos =
-          std::min((i + 1) * static_cast<index_t>(part) + overlap, txtlen);
+          std::min((cur + 1) * static_cast<index_t>(part) + overlap, txtlen);
 
-      threads[i] = std::thread([&, i]() {
+      thread = std::thread([&, startPos, endPos]() {
         search(text, pattern, startPos, endPos, action, nchars, matches);
       });
+      ++cur;
     }
 
-    for (int i = 0; i < numThreads; i++) threads[i].join();
-    return m_search_count;
+    for (auto& thread: threads) thread.join();
+    return search_count_;
   }
 
   /*
@@ -266,31 +254,25 @@ class Bm {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
+    const PreProced &data = registry_.getPreProced(nchars, pat);
+
     const size_t patlen = pat.length();
     const size_t textlen = text.length();
-
-    const PreProced &data = m_registry.getPreProced(nchars, pat);
-
     const index_t plen = static_cast<index_t>(patlen);
-
     index_t s = static_cast<index_t>(startPos);
     index_t en = static_cast<index_t>(endPos);
     index_t j, shift_gsfx, shift_bchr;
 
-    int local_iter_count = 0;
     while (s <= en - plen) {
-      if (local_iter_count % CHECK_TICKER == 0) {
-        if (m_search_count >= matches) {
-          return m_search_count;
-        }
-      }
-
       j = plen - 1;
       while (j >= 0 && pat[j] == text[s + j]) --j;
 
       if (j < 0) {
         action(text.begin() + s, text.end());
-        ++m_search_count;
+        if (search_count_.fetch_add(1, std::memory_order_relaxed) >= matches) {
+          done_.store(true);
+          return -1;
+        }
 
         shift_bchr = (s + plen < en) ? plen - data.badchars[text[s + patlen]]
                                      : static_cast<index_t>(1);
@@ -302,14 +284,14 @@ class Bm {
       }
 
       s += std::max(shift_gsfx, shift_bchr);
-      ++local_iter_count;
     }
-    return m_search_count;
+    return search_count_;
   }
 
  private:
-  PreProcFact m_registry;
-  PatStreamer m_streamer;
-  std::atomic<size_t> m_search_count = 0;
+  PreProcFactory registry_;
+  Streamer streamer_;
+  std::atomic<size_t> search_count_{0};
+  std::atomic<bool> done_{false};
 };
 }  // namespace hhf112

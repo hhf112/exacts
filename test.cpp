@@ -30,13 +30,15 @@ int main(int argc, char *argv[]) {
   std::cout << "classical search function find: " << en.count() << " ms.\n";
   std::cout << "found: " << res1.size() << '\n';
 
+  bm.set_search_count_(0);
   strt = high_resolution_clock::now();
-  bm.pfind(
+  int status = bm.pfind(
       filepath, pattern, [&](auto it, auto en) { res2.push_back(1); },
       matches);
   en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
   std::cout << "parallel search function pfind: " << en.count() << " ms.\n";
   std::cout << "found: " << res2.size() << '\n';
+  std::cout << "status: " << status << '\n';
 
   return 0;
 }
