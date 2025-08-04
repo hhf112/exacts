@@ -158,7 +158,7 @@ class PreProcFactory {
 
 class ExactS {
  public:
-  static constexpr int MAX_MATCHES = 10000000;
+  static constexpr int MAX_MATCHES = 1000000;
 
   // CONSTRUCTOR
   ExactS() = default;
@@ -184,7 +184,7 @@ class ExactS {
       const std::string &path, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int nchars = 256, int matches = MAX_MATCHES) {
+      int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
     if (streamer_.startStream(path) == 1) return -1;
 
@@ -215,7 +215,7 @@ class ExactS {
       const std::string &path, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int nchars = 256, int matches = MAX_MATCHES) {
+      int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
     if (streamer_.startStream(path) == 1) return -1;
 
@@ -227,7 +227,7 @@ class ExactS {
         });
 
     if (!status) return -1;
-    return search_count_;
+    return search_count_.load();
   }
 
   /*
@@ -242,7 +242,7 @@ class ExactS {
       const std::string &text, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int nchars = 256, int startIndex = 0, int matches = MAX_MATCHES) {
+      int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
 
     const int concurrency = std::thread::hardware_concurrency();
@@ -268,7 +268,7 @@ class ExactS {
     }
 
     for (auto &thread : threads) thread.join();
-    return search_count_;
+    return search_count_.load();
   }
 
   /*
@@ -282,7 +282,7 @@ class ExactS {
       size_t endPos,
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
-      int nchars = 256, int matches = MAX_MATCHES) {
+      int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
 
     const PreProced &data = registry_.getPreProced(nchars, pattern);
@@ -299,7 +299,7 @@ class ExactS {
         action(text.begin() + s, text.end());
         if (search_count_.fetch_add(1, std::memory_order_relaxed) >= matches) {
           done_.store(true);
-          return search_count_;
+          return search_count_.load();
         }
 
         shift_bchr = (s + m < en) ? m - data.badchars[text[s + m]]
@@ -313,7 +313,7 @@ class ExactS {
 
       s += std::max(shift_gsfx, shift_bchr);
     }
-    return search_count_;
+    return search_count_.load();
   }
 
  private:
