@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "ExactS.h"
+#include "./single include/ExactS.h"
 using namespace std;
 
 #define BADCHARS 256
