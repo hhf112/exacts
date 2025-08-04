@@ -5,11 +5,10 @@
 #include <functional>  //  std::function
 #include <iostream>    //  std::cerr
 #include <iterator>    //  std::back_inserter
-#include <new>
-#include <optional>  //  std::optional
-#include <string>    //  std::string
-#include <thread>    //  std::thread
-#include <vector>    //  std::vector
+#include <optional>    //  std::optional
+#include <string>      //  std::string
+#include <thread>      //  std::thread
+#include <vector>      //  std::vector
 
 namespace hhf112 {
 // GOLBAL typedefs
@@ -24,6 +23,11 @@ class Streamer {
 
   inline void endStream() { file_.close(); }
   inline int getChunkSize() { return chunk_size_; }
+
+
+  /*
+   * @brief set file stream, moderate passed chunk size
+   */
   inline int startStream(const std::string &p) {
     path_ = p;
     chunk_size_ = std::min(chunk_size_, (size_t)MAX_CHUNK_LIMIT);
@@ -36,6 +40,10 @@ class Streamer {
     return 0;
   }
 
+  /*
+   * @brief run action for every chunk read. copy trailing {overlap} length of each chunk to the front.
+   *@detail first is read is chunk_size + overlap 
+   */
   inline int forStream(size_t overlap,
                        const std::function<int(const std::string &)> &action) {
     if (overlap > chunk_size_) return -1;
@@ -44,6 +52,8 @@ class Streamer {
     } catch (std::bad_alloc &b) {
       std::cerr << "forStream: caught exception std::bad_alloc\n";
       return -1;
+    } catch (std::length_error& l) {
+      std::cerr << "forStream: caught exception std::length_error\n";
     }
 
     try {
@@ -55,7 +65,11 @@ class Streamer {
     while (file_.gcount()) {
       if (action(buffer_) == END_STREAM) break;
       std::memcpy(buffer_.data(), buffer_.data() + chunk_size_, overlap);
-      file_.read(buffer_.data() + overlap, chunk_size_);
+      try {
+        file_.read(buffer_.data() + overlap, chunk_size_);
+      } catch (std::ios_base::failure &f) {
+        return -1;
+      }
     }
 
     return 1;
@@ -85,6 +99,7 @@ class PreProcFactory {
  public:
   PreProcFactory() = default;
 
+  /*@brief fetch from or create in preprocessed tables cache*/
   inline const PreProced &getPreProced(int nchars, const std::string &str) {
     if (record_.count(str)) return record_[str];
 
@@ -143,12 +158,12 @@ class ExactS {
 
   // API
 
+  /* @brief reset search count and flag to stop threads.
+   * @note may shift this to function scope later*/
   inline void reset_search() {
     search_count_.store(0);
     done_.store(false);
   }
-  /* @brief search_count_ is atomic */
-  inline void set_search_count_(size_t n) { search_count_.store(n); }
   /* @brief by value */
   inline int get_search_count() { return search_count_.load(); }
 
