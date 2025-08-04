@@ -21,10 +21,11 @@ class Streamer {
   static constexpr int CONT_STREAM = 0;
 
   inline void endStream() { file_.close(); }
-  inline int getChunkSize() { return chunk_size_; }
+  inline int get_chunk_size() { return chunk_size_; }
+  inline void set_chunk_size(size_t n) { chunk_size_ = n; }
 
   /*
-   * @brief set file stream, moderate passed chunk size
+   * @brief set file, moderate passed chunk size
    */
   inline int startStream(const std::string &p) {
     path_ = p;
@@ -98,7 +99,7 @@ class PreProcFactory {
  public:
   PreProcFactory() = default;
 
-  /*@brief fetch from or create in preprocessed tables cache*/
+  /*@brief fetch from or create in preprocessed pattern cache*/
   inline const PreProced &getPreProced(int nchars, const std::string &str) {
     if (record_.count(str)) return record_[str];
 
@@ -113,7 +114,16 @@ class PreProcFactory {
   }
 
  private:
-  std::unordered_map<std::string, PreProced> record_;
+  /*@src
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-for-pattern-searching/*/
+  inline void badCharHeuristic(std::vector<arith_t> &badhcars,
+                               const std::string &str, size_t size) {
+    size_t i;
+    for (i = 0; i < size; i++) badhcars[(int)str[i]] = i;
+  }
+
+  /*@src
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic/*/
   inline void preprocess_strong_suffix(std::vector<size_t> &shift,
                                        std::vector<size_t> &bpos,
                                        const std::string &pat, size_t m) {
@@ -125,12 +135,8 @@ class PreProcFactory {
     }
   }
 
-  inline void badCharHeuristic(std::vector<arith_t> &badhcars,
-                               const std::string &str, size_t size) {
-    size_t i;
-    for (i = 0; i < size; i++) badhcars[(int)str[i]] = i;
-  }
-
+  /*@src
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic/*/
   inline void preprocess_case2(std::vector<size_t> &shift,
                                std::vector<size_t> &bpos,
                                const std::string &pat, size_t m) {
@@ -146,6 +152,8 @@ class PreProcFactory {
       bpos[i] = j;
     }
   }
+
+  std::unordered_map<std::string, PreProced> record_;
 };
 
 class ExactS {
@@ -157,8 +165,7 @@ class ExactS {
 
   // API
 
-  /* @brief reset search count and flag to stop threads.
-   * @note may shift this to function scope later*/
+  /* @brief reset search count and flag to stop threads. */
   inline void reset_search() {
     search_count_.store(0);
     done_.store(false);
@@ -201,7 +208,9 @@ class ExactS {
    * @params {action(it, en)}:
    *     @params {it} iterator to occurance
    *     @params {en} iterator to end of buffer
+   * @note occurances may be repeated
    */
+
   inline int find(
       const std::string &path, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
@@ -275,8 +284,8 @@ class ExactS {
                                std::string::const_iterator en)> &action,
       int nchars = 256, int matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
-    const PreProced &data = registry_.getPreProced(nchars, pattern);
 
+    const PreProced &data = registry_.getPreProced(nchars, pattern);
     const arith_t m = pattern.length();
     const size_t n = text.length();
     size_t s = startPos, en = endPos;
