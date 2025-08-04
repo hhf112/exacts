@@ -1,7 +1,6 @@
 #include <iostream>
-#include <vector>
 
-#include "Moore.h"
+#include "ExactS.h"
 using namespace std;
 
 #define BADCHARS 256
@@ -18,27 +17,22 @@ int main(int argc, char *argv[]) {
   std::string pattern(argv[2]), filepath(argv[1]);
   const long long int matches = 10000000;
 
-  hhf112::Bm bm;
-  std::vector<size_t> res1, res2;
-  res1.reserve(matches), res2.reserve(matches);
+  hhf112::ExactS bm;
 
   auto strt = high_resolution_clock::now();
-  bm.find(
-      filepath, pattern, [&](auto it, auto en) { res1.push_back(1); },
+  int cnt1 = bm.find(
+      filepath, pattern, [&](auto it, auto en) {},
       matches);
   auto en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
-  std::cout << "classical search function find: " << en.count() << " ms.\n";
-  std::cout << "found: " << res1.size() << '\n';
+  std::cout << "classical search function find: " << cnt1 << " in "<< en.count() << " ms.\n";
 
-  bm.set_search_count_(0);
+  bm.reset_search();
   strt = high_resolution_clock::now();
-  int status = bm.pfind(
-      filepath, pattern, [&](auto it, auto en) { res2.push_back(1); },
+  int cnt2 = bm.pfind(
+      filepath, pattern, [&](auto it, auto en) {},
       matches);
   en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
-  std::cout << "parallel search function pfind: " << en.count() << " ms.\n";
-  std::cout << "found: " << res2.size() << '\n';
-  std::cout << "status: " << status << '\n';
+  std::cout << "parallel search function pfind: " << cnt2 << " in " << en.count() << " ms.\n";
 
   return 0;
 }

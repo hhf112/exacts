@@ -5,10 +5,11 @@
 #include <functional>  //  std::function
 #include <iostream>    //  std::cerr
 #include <iterator>    //  std::back_inserter
-#include <optional>    //  std::optional
-#include <string>      //  std::string
-#include <thread>      //  std::thread
-#include <vector>      //  std::vector
+#include <new>
+#include <optional>  //  std::optional
+#include <string>    //  std::string
+#include <thread>    //  std::thread
+#include <vector>    //  std::vector
 
 namespace hhf112 {
 // GOLBAL typedefs
@@ -32,35 +33,32 @@ class Streamer {
       std::cerr << "startStream: unable to open file_\n";
       return 1;
     }
-    try {
-      buffer_.resize(chunk_size_);
-    } catch (std::length_error) {
-      std::cerr << "startStream: unable to allocate buffer_.\n";
-      return 1;
-    }
     return 0;
   }
 
-  inline void forStream(size_t patternlen,
-                        const std::function<int(const std::string &)> &action) {
-    if (patternlen == 0) {
-      std::cerr << "forStream: null pattern length.";
-      return;
+  inline int forStream(size_t overlap,
+                       const std::function<int(const std::string &)> &action) {
+    if (overlap > chunk_size_) return -1;
+    try {
+      buffer_.resize(chunk_size_ + overlap);
+    } catch (std::bad_alloc &b) {
+      std::cerr << "forStream: caught exception std::bad_alloc\n";
+      return -1;
     }
 
-    buffer_.resize(chunk_size_ + patternlen - 1);
-
-    if (!file_.read(buffer_.data(), chunk_size_ + patternlen - 1)) {
-      std::cerr << "forStream: failed to read " << chunk_size_ + patternlen - 1
-                << " bytes from file_\n";
-      return;
+    try {
+      file_.read(buffer_.data(), chunk_size_ + overlap);
+    } catch (std::ios_base::failure &f) {
+      return -1;
     }
 
     while (file_.gcount()) {
-      if (action(buffer_) == 1) break;
-      std::memcpy(buffer_.data(), buffer_.data() + chunk_size_, patternlen - 1);
-      file_.read(buffer_.data() + patternlen - 1, chunk_size_);
+      if (action(buffer_) == END_STREAM) break;
+      std::memcpy(buffer_.data(), buffer_.data() + chunk_size_, overlap);
+      file_.read(buffer_.data() + overlap, chunk_size_);
     }
+
+    return 1;
   }
 
  private:
@@ -136,14 +134,19 @@ class PreProcFactory {
   }
 };
 
-class Bm {
+class ExactS {
  public:
-  static constexpr int MAX_MATCHES = 1000000;
+  static constexpr int MAX_MATCHES = 10000000;
 
   // CONSTRUCTOR
-  Bm() = default;
+  ExactS() = default;
 
   // API
+
+  inline void reset_search() {
+    search_count_.store(0);
+    done_.store(false);
+  }
   /* @brief search_count_ is atomic */
   inline void set_search_count_(size_t n) { search_count_.store(n); }
   /* @brief by value */
@@ -154,7 +157,6 @@ class Bm {
    * @params {action(it, en)}:
    *     @params {it} iterator to occurance
    *     @params {en} iterator to end of buffer
-   *
    * @note occurances may be random and repeated
    */
   inline int pfind(
@@ -165,16 +167,17 @@ class Bm {
     if (streamer_.startStream(path) == 1) return -1;
 
     bool fail = 0;
-    streamer_.forStream(pattern.length(), [&](const std::string &buf) {
-      if (done_.load()) return Streamer::END_STREAM;
-      if (parallelSearch(buf, pattern, action, nchars, matches) < 0) {
-        fail = 1;
-        return Streamer::END_STREAM;
-      }
-      return Streamer::CONT_STREAM;
-    });
+    int status =
+        streamer_.forStream(pattern.length() - 1, [&](const std::string &buf) {
+          if (done_.load()) return Streamer::END_STREAM;
+          if (parallelSearch(buf, pattern, action, nchars, matches) < 0) {
+            fail = 1;
+            return Streamer::END_STREAM;
+          }
+          return Streamer::CONT_STREAM;
+        });
 
-    if (fail) return -1;
+    if (fail || status == -1) return -1;
     return search_count_.load();
   }
 
@@ -191,12 +194,14 @@ class Bm {
       int nchars = 256, int matches = MAX_MATCHES) {
     if (streamer_.startStream(path) == 1) return -1;
 
-    streamer_.forStream(pattern.length(), [&](const std::string &buf) {
-      if (done_.load()) return Streamer::END_STREAM;
-      search(buf, pattern, 0, buf.length(), action, nchars, matches);
-      return Streamer::CONT_STREAM;
-    });
+    int status =
+        streamer_.forStream(pattern.length() - 1, [&](const std::string &buf) {
+          if (done_.load()) return Streamer::END_STREAM;
+          search(buf, pattern, 0, buf.length(), action, nchars, matches);
+          return Streamer::CONT_STREAM;
+        });
 
+    if (!status) return -1;
     return search_count_;
   }
 
@@ -238,7 +243,7 @@ class Bm {
       ++cur;
     }
 
-    for (auto& thread: threads) thread.join();
+    for (auto &thread : threads) thread.join();
     return search_count_;
   }
 
@@ -271,7 +276,7 @@ class Bm {
         action(text.begin() + s, text.end());
         if (search_count_.fetch_add(1, std::memory_order_relaxed) >= matches) {
           done_.store(true);
-          return -1;
+          return search_count_;
         }
 
         shift_bchr = (s + plen < en) ? plen - data.badchars[text[s + patlen]]
