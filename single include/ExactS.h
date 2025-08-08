@@ -2,6 +2,7 @@
 #include <atomic>      //  std::atomic
 #include <climits>     // LLONG_MAX
 #include <cstring>     //  std::memcpy
+#include <filesystem>  //std::filesystem
 #include <fstream>     //  std::fstream
 #include <functional>  //  std::function
 #include <iostream>    //  std::cerr
@@ -25,23 +26,23 @@ class Streamer {
   inline void set_chunk_size(size_t n) { chunk_size_ = n; }
 
   /*
-   * @brief set file, moderate passed chunk size
+   * @brief set `file`, moderate passed chunk size
    */
-  inline int startStream(const std::string &p) {
+  inline size_t startStream(const std::string &p) {
     path_ = p;
     chunk_size_ = std::min(chunk_size_, (size_t)MAX_CHUNK_LIMIT);
     file_ = std::fstream(path_, std::ios::in);
 
     if (!file_) {
       std::cerr << "startStream: unable to open file_\n";
-      return 1;
+      return -1;
     }
-    return 0;
+    return std::filesystem::file_size(path_);
   }
 
   /*
-   * @brief run action for every chunk read. copy trailing {overlap} length of
-   *each chunk to the front.
+   * @brief run `{action}` for every chunk read. copy trailing `{overlap}`
+   *length ofA each chunk to the front.
    *@detail first is read is chunk_size + overlap
    */
   inline int forStream(size_t overlap,
@@ -115,7 +116,7 @@ class PreProcFactory {
 
  private:
   /*@src
-   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-for-pattern-searching/*/
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-for-pattern-searching*/
   inline void badCharHeuristic(std::vector<arith_t> &badhcars,
                                const std::string &str, size_t size) {
     size_t i;
@@ -123,7 +124,7 @@ class PreProcFactory {
   }
 
   /*@src
-   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic/*/
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic*/
   inline void preprocess_strong_suffix(std::vector<size_t> &shift,
                                        std::vector<size_t> &bpos,
                                        const std::string &pat, size_t m) {
@@ -136,7 +137,7 @@ class PreProcFactory {
   }
 
   /*@src
-   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic/*/
+   * https://www.geeksforgeeks.org/dsa/boyer-moore-algorithm-good-suffix-heuristic*/
   inline void preprocess_case2(std::vector<size_t> &shift,
                                std::vector<size_t> &bpos,
                                const std::string &pat, size_t m) {
@@ -174,10 +175,10 @@ class ExactS {
   inline int get_search_count() { return search_count_.load(); }
 
   /*
-   * @brief run {action} for every occurance in buffer
-   * @params {action(it, en)}:
-   *     @params {it} iterator to occurance
-   *     @params {en} iterator to end of buffer
+   * @brief run `{action}` for every occurance in buffer
+   * @params `{action(it, en)}`:
+   *     @params `{it}` iterator to occurance
+   *     @params `{en}` iterator to end of buffer
    * @note occurances may be random and repeated
    */
   inline int pfind(
@@ -186,7 +187,6 @@ class ExactS {
                                std::string::const_iterator en)> &action,
       int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
-    if (streamer_.startStream(path) == 1) return -1;
 
     bool fail = 0;
     int status =
@@ -204,13 +204,12 @@ class ExactS {
   }
 
   /*
-   * @brief run {action} for every occurance in each buffer
-   * @params {action(it, en)}:
-   *     @params {it} iterator to occurance
-   *     @params {en} iterator to end of buffer
+   * @brief run `{action}` for every occurance in buffer
+   * @params `{action(it, en)}`:
+   *     @params `{it}` iterator to occurance
+   *     @params `{en}` iterator to end of buffer
    * @note occurances may be repeated
    */
-
   inline int find(
       const std::string &path, const std::string &pattern,
       const std::function<void(std::string::const_iterator it,
@@ -231,12 +230,11 @@ class ExactS {
   }
 
   /*
-   * @brief run {action} for every occurance in {text}
-   * @params {action(it, en)}:
-   *     @params {it} iterator to occurance
-   *     @params {en} iterator to end of {text}
-   *
-   * @note occurances may be random and repeated
+   * @brief run `{action}` for every occurance in `{text}`
+   * @params `{action(it, en)}`:
+   *     @params `{it}` iterator to occurance
+   *     @params `{en}` iterator to end of `{text}`
+   * @note occurances may be repeated
    */
   inline int parallelSearch(
       const std::string &text, const std::string &pattern,
@@ -272,10 +270,11 @@ class ExactS {
   }
 
   /*
-   * @brief run {action} for every occurance in {text}
-   * @params {action(it, en)}:
-   *     @params {it} iterator to occurance
-   *     @params {en} iterator to end of {text}
+   * @brief run `{action}` for every occurance in `{text}`
+   * @params `{action(it, en)}`:
+   *     @params `{it}` iterator to occurance
+   *     @params `{en}` iterator to end of `{text}`
+   * @note occurances may be repeated
    */
   inline int search(
       const std::string &text, const std::string &pattern, size_t startPos,

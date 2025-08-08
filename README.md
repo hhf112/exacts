@@ -7,7 +7,7 @@ A **superfast** exact string searcher available for both sequential and parallel
 - I hate parsing JS*N.
 - There are many more cases like the above.
 
-# Perf 
+# Perf (100MB, 2.74 Million finds)
 | Metric          | `find` (Single-Threaded) | `pfind` (Parallel) | Speedup               |
 |-----------------|-------------------------|--------------------|-----------------------|
 | **Avg. Time**   | 407 ms                  | 180 ms             | **55.8% faster**      |
