@@ -322,7 +322,5 @@ class ExactS {
   Streamer streamer_;
   std::atomic<size_t> search_count_{0};
   std::atomic<bool> done_{false};
-  std::vector<std::thread> threads_;
-  std::vector<std::thread>::iterator cur_thread_;
 };
 }  // namespace hhf112
