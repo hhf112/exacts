@@ -2,7 +2,6 @@
 #include <atomic>      //  std::atomic
 #include <climits>     // LLONG_MAX
 #include <cstring>     //  std::memcpy
-#include <filesystem>  //std::filesystem
 #include <fstream>     //  std::fstream
 #include <functional>  //  std::function
 #include <iostream>    //  std::cerr
@@ -35,9 +34,9 @@ class Streamer {
 
     if (!file_) {
       std::cerr << "startStream: unable to open file_\n";
-      return -1;
+      return 1;
     }
-    return std::filesystem::file_size(path_);
+    return 0;
   }
 
   /*
@@ -55,6 +54,7 @@ class Streamer {
       return -1;
     } catch (std::length_error &l) {
       std::cerr << "forStream: caught exception std::length_error\n";
+      return -1;
     }
 
     try {
@@ -187,6 +187,7 @@ class ExactS {
                                std::string::const_iterator en)> &action,
       int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
+    if (streamer_.startStream(path) == 1) return -1;
 
     bool fail = 0;
     int status =
@@ -241,6 +242,7 @@ class ExactS {
       const std::function<void(std::string::const_iterator it,
                                std::string::const_iterator en)> &action,
       int nchars = 256, size_t matches = MAX_MATCHES) {
+
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
 
     const int concurrency = std::thread::hardware_concurrency();
@@ -320,5 +322,7 @@ class ExactS {
   Streamer streamer_;
   std::atomic<size_t> search_count_{0};
   std::atomic<bool> done_{false};
+  std::vector<std::thread> threads_;
+  std::vector<std::thread>::iterator cur_thread_;
 };
 }  // namespace hhf112
