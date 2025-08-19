@@ -1,14 +1,16 @@
 #pragma once
-#include <atomic>      //  std::atomic
+#include <atomic>  //  std::atomic
+#include <cassert>
 #include <climits>     // LLONG_MAX
 #include <cstring>     //  std::memcpy
 #include <filesystem>  //std::filesystem
 #include <fstream>     //  std::fstream
 #include <functional>  //  std::function
 #include <iostream>    //  std::cerr
-#include <string>      //  std::string
-#include <thread>      //  std::thread
-#include <vector>      //  std::vector
+#include <iterator>
+#include <string>  //  std::string
+#include <thread>  //  std::thread
+#include <vector>  //  std::vector
 
 namespace hhf112 {
 // GOLBAL typedefs
@@ -187,15 +189,25 @@ class ExactS {
                                std::string::const_iterator en)> &action,
       int nchars = 256, size_t matches = MAX_MATCHES) {
     if (pattern.length() > static_cast<size_t>(LLONG_MAX)) return -1;
+    int file_size = streamer_.startStream(path);
+    if (file_size == -1) return -1;
+
+    int total_potential_chunks = (file_size / streamer_.get_chunk_size()) + 1;
+    int total_potential_threads =
+        total_potential_chunks * std::thread::hardware_concurrency() + total_potential_chunks;
+
+    threads_.resize(total_potential_threads);  // one more.
+    cur_thread_ = threads_.begin();
 
     bool fail = 0;
     int status =
         streamer_.forStream(pattern.length() - 1, [&](const std::string &buf) {
-          if (done_.load()) return Streamer::END_STREAM;
           if (parallelSearch(buf, pattern, action, nchars, matches) < 0) {
             fail = 1;
             return Streamer::END_STREAM;
           }
+
+          if (done_.load()) return Streamer::END_STREAM;
           return Streamer::CONT_STREAM;
         });
 
@@ -246,26 +258,29 @@ class ExactS {
     const int concurrency = std::thread::hardware_concurrency();
     if (!concurrency) return -1;
     const size_t ntext = text.length();
-    const arith_t m = pattern.length();
-
-    const int numThreads = concurrency + bool(ntext % concurrency);
-
-    std::vector<std::thread> threads(numThreads);
 
     const size_t part = ntext / concurrency;
-    const arith_t overlap = m - 1;
+    const arith_t overlap = pattern.length() - 1;
     int cur = 0;
-    for (auto &thread : threads) {
-      arith_t startPos = cur * part;
-      arith_t endPos = std::min((cur + 1) * part + overlap, ntext);
+    arith_t startPos, endPos = 0;
 
-      thread = std::thread([&, startPos, endPos]() {
+    std::vector<std::thread>::iterator cur_thread_local = cur_thread_;
+    while (endPos < ntext) {
+      startPos = cur * part;
+      endPos = std::min((cur + 1) * part + overlap, ntext);
+
+      *cur_thread_local = std::thread([&, startPos, endPos]() {
         search(text, pattern, startPos, endPos, action, nchars, matches);
       });
       ++cur;
+      ++cur_thread_local;
     }
 
-    for (auto &thread : threads) thread.join();
+    while (cur_thread_ != cur_thread_local) {
+      cur_thread_->join();
+      ++cur_thread_;
+    }
+
     return search_count_.load();
   }
 
@@ -320,5 +335,7 @@ class ExactS {
   Streamer streamer_;
   std::atomic<size_t> search_count_{0};
   std::atomic<bool> done_{false};
+  std::vector<std::thread> threads_;
+  std::vector<std::thread>::iterator cur_thread_;
 };
 }  // namespace hhf112

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ostream>
 
 #include "./single include/ExactS.h"
 using namespace std;
@@ -29,7 +30,7 @@ int main(int argc, char *argv[]) {
   int cnt2 =
       bm.pfind(filepath, pattern, [&](auto it, auto en) {}, 256, matches);
   en = duration_cast<milliseconds>(high_resolution_clock::now() - strt);
-  std::cout << "parallel search function pfind: " << cnt2 << " in "
+  std::cerr << "parallel search function pfind: " << cnt2 << " in "
             << en.count() << " ms.\n";
 
   return 0;
