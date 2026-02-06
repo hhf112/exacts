@@ -1,6 +1,6 @@
 
 # ExactS (formerly Moore Search) <img src = "https://img.shields.io/github/actions/workflow/status/hhf112/moore-search/c-cpp.yml" alt="build status">
-A fast exact string searcher available for both sequential and parallel workflows. Go ahead and give it a try! <br>
+A fast exact string searcher available for both sequential and parallel workflows. <br>
 ### What is it?: 
 - A header only exact string searching API based on Boyre Moore's exact string searching algorithm, parallelized and sequential. compatible with C++17. <br>
 
